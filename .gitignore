@@ -1,0 +1,25 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+*.elf
+*.bin
+*.hex
+*.map
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Waveshare
+waveshare_demo/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
