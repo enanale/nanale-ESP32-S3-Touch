@@ -23,3 +23,6 @@ __pycache__/
 
 # OS
 Thumbs.db
+
+# Secrets
+src/secrets.h

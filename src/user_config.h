@@ -19,7 +19,8 @@
 #define EXAMPLE_PIN_NUM_LCD_DATA2 (GPIO_NUM_13)
 #define EXAMPLE_PIN_NUM_LCD_DATA3 (GPIO_NUM_14)
 #define EXAMPLE_PIN_NUM_LCD_RST (GPIO_NUM_21)
-#define EXAMPLE_PIN_NUM_BK_LIGHT (GPIO_NUM_8)
+#define EXAMPLE_PIN_NUM_BK_LIGHT 8
+#define EXAMPLE_PIN_NUM_PWR_BTN (GPIO_NUM_16)
 
 // Resolution
 #define EXAMPLE_LCD_H_RES 172
@@ -33,5 +34,14 @@
 #define LVGL_TASK_MIN_DELAY_MS 5
 #define LVGL_TASK_STACK_SIZE (8 * 1024)
 #define LVGL_TASK_PRIORITY 2
+
+// WiFi Credentials
+// WiFi Credentials
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#define WIFI_SSID "YOUR_SSID"
+#define WIFI_PASS "YOUR_PASS"
+#endif
 
 #endif

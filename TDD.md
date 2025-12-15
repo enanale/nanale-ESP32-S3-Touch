@@ -74,6 +74,22 @@ ring (optional if RAM permits, otherwise distinct UI refresh areas).
 - **IO Expander:**
   - Must be initialized *before* display to release resets.
 
+### 2.4 Power Button & Sleep
+- **Hardware:** GPIO 16 (labeled Power/Touch-Int).
+- **Configuration:** `INPUT_PULLUP` (Active Low).
+- **Implementation:**
+    - **Trigger:** Polling in `loop()` (or Interrupt). Current impl uses Polling with Debounce.
+    - **Backlight Control:** `lvgl_port_set_backlight(bool)` wrapper. Active Low logic (0=ON, 1=OFF).
+    - **Sleep API:** `esp_light_sleep_start()`.
+    - **Wakeup Source:** `esp_sleep_enable_ext0_wakeup(GPIO_NUM_16, 0)` (Wake on LOW level).
+    - **Logic:**
+        1. Detect Button Press (Low).
+        2. Turn Off Backlight.
+        3. Wait for Button Release (to avoid immediate wake loop).
+        4. Enter Light Sleep.
+        5. Wake on Button Press.
+        6. Turn On Backlight.
+
 ## 3. Data Flow
 1. **Boot:** Initialize IO Expander -> Power up LCD -> Init Graphics -> Show "Hello World".
 2. **Background:** Start WiFi Task -> Connect -> Fetch Weather JSON -> Parse to Struct.

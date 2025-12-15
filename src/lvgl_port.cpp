@@ -292,12 +292,7 @@ static void lvgl_port_task(void *arg) {
   uint32_t check_timer = 0;
 
   while (1) {
-    // Heartbeat for Backlight (Active Low: Force 0)
-    if (xTaskGetTickCount() - check_timer > pdMS_TO_TICKS(1000)) {
-      gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 0);
-      check_timer = xTaskGetTickCount();
-      // Serial.println("Force BL ON");
-    }
+    // Heartbeat removed to allow sleep mode control
 
     if (lvgl_lock(-1)) {
       task_delay_ms = lv_timer_handler();
@@ -318,6 +313,15 @@ static const axs15231b_lcd_init_cmd_t lcd_init_cmds[] = {
     {0x11, (uint8_t[]){0x00}, 0, 100},
     {0x29, (uint8_t[]){0x00}, 0, 100},
 };
+
+// -------------------------------------------------------------------------
+// Helper: Backlight Control (Active Low)
+// -------------------------------------------------------------------------
+void lvgl_port_set_backlight(bool on) {
+  // Active Low: 0 = ON, 1 = OFF
+  gpio_set_level((gpio_num_t)EXAMPLE_PIN_NUM_BK_LIGHT, on ? 0 : 1);
+  ESP_LOGI(TAG, "Backlight Set: %s", on ? "ON" : "OFF");
+}
 
 void lvgl_port_init(void) {
   Serial.println("[LVGL] Init Starting...");
@@ -351,7 +355,7 @@ void lvgl_port_init(void) {
 
   // Backlight Control (Active Low confirmed: 0=ON)
   // We keep it OFF initially, then turn ON after panel init
-  gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 1); // OFF initially
+  lvgl_port_set_backlight(false); // OFF initially
 
   // Bus Config
   spi_bus_config_t buscfg = {};
@@ -406,7 +410,7 @@ void lvgl_port_init(void) {
   ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
 
   // Ensure Backlight is ON again (Active Low)
-  gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 0);
+  lvgl_port_set_backlight(true);
 
   // --- DRIVER INIT COMPLETE ---
   ESP_LOGI(TAG, "Display Driver Initialized.");
