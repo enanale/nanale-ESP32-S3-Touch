@@ -52,7 +52,7 @@ void update_ui() {
           std::vector<WeatherData> data = weatherMgr.getForecasts();
           for (const auto &w : data) {
             statusText +=
-                w.city + ": " + String(w.tempC) + "C, " + w.condition + "\n";
+                w.city + ": " + String(w.tempF) + "F, " + w.condition + "\n";
           }
         } else {
           statusText += "Fetching Weather...";

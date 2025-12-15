@@ -4,23 +4,33 @@
 #include <Arduino.h>
 #include <vector>
 
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+
 struct WeatherData {
   String city;
-  int tempC;
+  int tempF;
   String condition;
+};
+
+struct CityCoords {
+  String name;
+  float lat;
+  float lon;
 };
 
 class WeatherManager {
 public:
   WeatherManager();
-  void update(); // Check if time to fetch
+  void update();
   std::vector<WeatherData> getForecasts();
   bool hasData();
 
 private:
   std::vector<WeatherData> _forecasts;
   unsigned long _lastFetch;
-  void fetchMockData();
+  void fetchRealData();
+  String getWeatherCondition(int code);
 };
 
 #endif
