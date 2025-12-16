@@ -9,7 +9,7 @@
 
 struct WeatherData {
   String city;
-  int tempF;
+  float tempF;
   String condition;
 };
 
@@ -25,11 +25,12 @@ public:
   void update();
   std::vector<WeatherData> getForecasts();
   bool hasData();
+  void fetchRealData();              // Now public
+  WeatherData getWeather(int index); // New method
 
 private:
   std::vector<WeatherData> _forecasts;
   unsigned long _lastFetch;
-  void fetchRealData();
   String getWeatherCondition(int code);
 };
 

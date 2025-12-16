@@ -21,6 +21,89 @@
 // Globals
 static const char *TAG = "lvgl_port";
 static SemaphoreHandle_t lvgl_mux = NULL;
+
+// Hardware Config
+#define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
+#define LCD_BK_LIGHT_ON_LEVEL 0
+#define LCD_BK_LIGHT_OFF_LEVEL !LCD_BK_LIGHT_ON_LEVEL
+#define PIN_NUM_BK_LIGHT 8
+#define PIN_NUM_LCD_CS 9
+#define PIN_NUM_LCD_PCLK 10
+#define PIN_NUM_LCD_DATA0 11
+#define PIN_NUM_LCD_DATA1 12
+#define PIN_NUM_LCD_DATA2 13
+#define PIN_NUM_LCD_DATA3 14
+#define PIN_NUM_LCD_RST 21
+
+// Touch Config (CST328)
+#define TOUCH_I2C_ADDR 0x3B
+#define TOUCH_SDA 17
+#define TOUCH_SCL 18
+#define TOUCH_RES_X 172
+#define TOUCH_RES_Y 640
+
+static SemaphoreHandle_t lvgl_mutex = NULL;
+static lv_display_t *display = NULL;
+static lv_indev_t *indev_touch = NULL;
+
+// Internal prototypes
+static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data);
+
+// CST328 Touch Logic
+// Magic Command Sequence to wake up the controller (from Vendor Demo)
+static const uint8_t CST328_INIT_CMD[11] = {0xb5, 0xab, 0xa5, 0x5a, 0x0, 0x0,
+                                            0x0,  0x0e, 0x0,  0x0,  0x0};
+
+void touch_init(void) {
+  Wire.begin(TOUCH_SDA, TOUCH_SCL);
+
+  // Register Touch Driver to LVGL
+  lv_indev_t *indev = lv_indev_create();
+  lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(indev, touch_read_cb);
+  indev_touch = indev;
+}
+
+static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
+  uint8_t buff[32] = {0};
+
+  // 1. Wake / Init Command
+  Wire.beginTransmission(TOUCH_I2C_ADDR);
+  Wire.write(CST328_INIT_CMD, sizeof(CST328_INIT_CMD));
+  if (Wire.endTransmission(false) != 0) {
+    data->state = LV_INDEV_STATE_RELEASED;
+    return;
+  }
+
+  // 2. Read Data
+  Wire.requestFrom((int)TOUCH_I2C_ADDR, 32);
+  if (Wire.available() < 6) {
+    data->state = LV_INDEV_STATE_RELEASED;
+    return;
+  }
+  Wire.readBytes(buff, 32);
+
+  // 3. Parse Gesture / Points
+  // Byte 1 represents the number of touch points
+  bool touched = (buff[1] > 0 && buff[1] < 5);
+
+  if (touched) {
+    data->state = LV_INDEV_STATE_PRESSED;
+
+    // Parse raw coordinates I2C data (Big Endian)
+    uint16_t pointX = (((uint16_t)buff[2] & 0x0f) << 8) | (uint16_t)buff[3];
+    uint16_t pointY = (((uint16_t)buff[4] & 0x0f) << 8) | (uint16_t)buff[5];
+
+    // Coordinate Mapping for Landscape Mode:
+    // Physical X becomes Logical Y (inverted)
+    // Physical Y becomes Logical X
+    data->point.x = pointY;
+    data->point.y = TOUCH_RES_Y - pointX;
+
+  } else {
+    data->state = LV_INDEV_STATE_RELEASED;
+  }
+}
 static SemaphoreHandle_t flush_done_semaphore = NULL;
 
 // Rotation Buffer
@@ -326,7 +409,8 @@ void lvgl_port_set_backlight(bool on) {
 void lvgl_port_init(void) {
   Serial.println("[LVGL] Init Starting...");
 
-  // 1. Create Synchronization Primitives
+  // Initialize Power / IO Expander
+  enable_display_power();
   lvgl_mux = xSemaphoreCreateMutex();
   flush_done_semaphore = xSemaphoreCreateBinary();
   if (!lvgl_mux || !flush_done_semaphore) {
@@ -423,7 +507,12 @@ void lvgl_port_init(void) {
   lv_display_t *disp = lv_display_create(EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES);
 
   // Landscape Rotation (Software - managed in flush_cb)
+  // Verify Rotation
+  // lv_display_set_rotation(display, LV_DISPLAY_ROTATION_90); // Handled by
+  // software buffer
   lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270); // Or 90
+
+  touch_init(); // Initialize Touch Driver
 
   // Alloc
   uint8_t *spiram_buf =

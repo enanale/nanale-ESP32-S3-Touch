@@ -17,5 +17,6 @@
 #define LV_USE_THEME_DEFAULT 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_28 1
+#define LV_COLOR_16_SWAP 1 // Enabled for Main Weather Display
 
 #endif

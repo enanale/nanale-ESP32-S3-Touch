@@ -37,16 +37,30 @@ A portable, battery-powered weather display station running on the Waveshare ESP
     - Scroll the weather information for the specified cities on the display.
     - Information to display: City Name, Temperature, Conditions (e.g., "Clear", "Rain").
 
-### 3.4 Power Management [NEW]
+### 3.4 Power Management
 - **Power Button:** Side button (GPIO 16).
 - **Functionality:**
     - **Single Press:** Toggle between Active and Sleep Mode.
     - **Sleep Mode:**
         - Turn off Display Backlight immediately.
-        - Enter `Light Sleep` to conserve power while retaining RAM state.
+        - Enter `Light Sleep` to conserve power.
     - **Wake Mode:**
         - Resume instantly.
         - Turn on Display Backlight.
+
+### 3.5 UI Enhancements [NEW]
+- **Status Bar:**
+    - **Location:** Bottom of the screen.
+    - **Style:** Blue background, White text.
+    - **Content:** WiFi Status, IP Address, Battery Voltage/Percentage.
+    - **Visibility:** Always visible.
+- **Weather Display:**
+    - **Location:** Main central area (above status bar).
+    - **Style:** Large Font (approx 2x current size), Centered.
+    - **Content:** City Name, Temperature, Condition.
+- **Interaction:**
+    - **Gesture:** Swipe Left/Right anywhere on the screen.
+    - **Action:** Switch between the 3 configured cities (Oakland <-> SF <-> Mountain View).
 
 ## 4. Success Metrics
 - Device boots and shows splash screen.

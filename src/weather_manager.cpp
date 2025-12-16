@@ -120,6 +120,16 @@ String WeatherManager::getWeatherCondition(int code) {
   }
 }
 
+WeatherData WeatherManager::getWeather(int index) {
+  if (_forecasts.empty()) {
+    return {"Loading...", 0.0, ""};
+  }
+  if (index >= 0 && index < _forecasts.size()) {
+    return _forecasts[index];
+  }
+  return _forecasts[0];
+}
+
 std::vector<WeatherData> WeatherManager::getForecasts() { return _forecasts; }
 
 bool WeatherManager::hasData() { return !_forecasts.empty(); }
