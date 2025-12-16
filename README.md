@@ -45,5 +45,6 @@ A simplified, clean implementation of LVGL 9 on the Waveshare ESP32-S3-Touch-LCD
 - [x] Landscape Orientation (Manual Software Rotation)
 - [x] WiFi Connectivity
 - [x] Weather Data (Open-Meteo REST API)
+- [x] Battery Monitoring (ADC GPIO 4)
 - [x] Power Button Sleep/Wake
 - [ ] Touch Input (Skipped)

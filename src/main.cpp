@@ -1,3 +1,4 @@
+#include "battery_manager.h"
 #include "driver/gpio.h"
 #include "esp_sleep.h"
 #include "lvgl.h"
@@ -10,6 +11,7 @@
 // Globals
 AppNetworkManager netMgr;
 WeatherManager weatherMgr;
+BatteryManager batMgr;
 lv_obj_t *info_label = NULL;
 
 // Helper: Check Power Button
@@ -46,7 +48,11 @@ void update_ui() {
       String statusText = "WiFi: " + netMgr.getStatusString() + "\n";
 
       if (netMgr.isConnected()) {
-        statusText += "IP: " + netMgr.getIP() + "\n\n";
+        statusText += "IP: " + netMgr.getIP() + "\n";
+
+        // Add Battery Info
+        statusText += "Bat: " + String(batMgr.getVoltage(), 2) + "V (" +
+                      String(batMgr.getPercentage()) + "%)\n\n";
 
         if (weatherMgr.hasData()) {
           std::vector<WeatherData> data = weatherMgr.getForecasts();
@@ -76,6 +82,7 @@ void setup() {
 
   lvgl_port_init();
   netMgr.begin();
+  batMgr.begin();
 
   // Create UI
   if (lvgl_lock(1000)) {
@@ -96,6 +103,7 @@ void loop() {
   check_power_button();
   netMgr.update();
   weatherMgr.update();
+  batMgr.update();
   update_ui();
   delay(10);
 }
