@@ -30,6 +30,11 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 * **RTC:** **PCF85063** (I2C Addr: 0x51)  
 * **Storage:** MicroSD Card Slot (SPI Interface)  
 * **Battery:** Power management via charging circuit; voltage sensing via ADC.
+    * **ADC Pin:** GPIO 4 (ADC1 Channel 3)
+    * **Voltage Multiplier:** 3.0x
+    * **Battery Type:** 3.7V Lithium 18650
+    * **Discharge Handling:** Requires a non-linear mapping (discharge curve) for accurate percentage calculation (e.g., 3.6V-3.9V range is non-linear).
+    * **Charging Status:** No software-readable flag found on TCA9554 or direct GPIO in standard demo; monitor voltage trends instead.
 
 ## **3\. Pin Definitions & GPIO Mapping**
 
@@ -61,9 +66,13 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 | **Touch\_INT** | GPIO 16 | Interrupt pin (Active Low) |
 | **Touch\_RST** | N/A | Often shared or internal |
 
-### **IO Expander (TCA9554PWR) - Correction**
+### **IO Expander (TCA9554PWR) - Key Functions**
 
-*Correction*: Earlier documentation suggested the IO Expander controlled RST/BL. **This is incorrect for the 3.49" Touch revision.** The demo code confirms direct GPIO control for these functions. The IO Expander (if populated) may be used for other peripherals but is **NOT** required for basic display operation.
+* **Address:** 0x20
+* **Pin 6:** Power Rail Control (Set 1 to keep ON, 0 to Power Off)
+* **Pin 7:** Often used for peripheral enabling.
+* **Note**: Earlier documentation suggested it controlled LCD RST/BL. In the 3.49" Touch revision, these are direct GPIOs (see above).
+
 
 ### **Audio (I2S)**
 
@@ -93,44 +102,20 @@ void setupWiFi() {
     Serial.println("\\nWiFi Connected");  
 }
 
-### **2\. Display (Arduino\_GFX)**
+### **2\. Display (LVGL V9)**
 
-Using Arduino\_GFX is the most reliable method for the QSPI AXS15231B driver.
+The transition to LVGL V9 requires specific backend porting for the QSPI AXS15231B driver.
 
-**Initialization:**
+**Key Configurations (`lv_conf.h`):**
+- `LV_COLOR_DEPTH 16`
+- `LV_COLOR_16_SWAP 1` (Required for correct color rendering on this panel)
+- `LV_FONT_MONTSERRAT_18`, `28`, `40` (Enabled for high-resolution weather UI)
 
-\#include \<Arduino\_GFX\_Library.h\>  
-\#include \<Wire.h\>
+**Initialization Notes:**
+- Handle display rotation in the flush callback if needed (172x640 is naturally portrait).
+- Use `esp_lcd` vendor drivers for the AXS15231B.
+- Consolidate UI elements (e.g., battery icon + text) to prevent overlaps on the narrow 172px width.
 
-// Define IO Expander (Simplified pseudo-code, requires Wire library)  
-\#define TCA9554\_ADDR 0x20  
-void enableDisplayPower() {  
-    Wire.beginTransmission(TCA9554\_ADDR);  
-    Wire.write(0x03); // Configuration Register  
-    Wire.write(0x00); // Set all pins as OUTPUT  
-    Wire.endTransmission();
-
-    Wire.beginTransmission(TCA9554\_ADDR);  
-    Wire.write(0x01); // Output Port Register  
-    Wire.write(0xFF); // Set all HIGH (Enable Backlight, Release Resets)  
-    Wire.endTransmission();  
-    delay(100);  
-}
-
-Arduino\_DataBus \*bus \= new Arduino\_ESP32QSPI(  
-    42 /\* CS \*/, 10 /\* SCK \*/, 11 /\* D0 \*/, 12 /\* D1 \*/, 13 /\* D2 \*/, 14 /\* D3 \*/);
-
-Arduino\_GFX \*gfx \= new Arduino\_AXS15231B(  
-    bus, GFX\_NOT\_DEFINED /\* RST via Expander \*/,   
-    0 /\* rotation \*/, false /\* IPS \*/, 172 /\* w \*/, 640 /\* h \*/);
-
-void setupDisplay() {  
-    Wire.begin(8, 9);  
-    enableDisplayPower();  
-    gfx-\>begin();  
-    gfx-\>fillScreen(BLACK);  
-    // Note: Due to 172x640 aspect ratio, consider setRotation(1) for landscape (640x172)  
-}
 
 ### **3\. Touch Input**
 

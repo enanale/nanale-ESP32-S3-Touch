@@ -79,7 +79,21 @@ void update_status_bar() {
   // Battery
   float voltage = batMgr.getVoltage();
   int pct = batMgr.getPercentage();
-  String batStr = String(pct) + "% (" + String(voltage, 2) + "V)";
+
+  // Icon based on percentage
+  const char *icon = LV_SYMBOL_BATTERY_FULL;
+  if (pct < 10)
+    icon = LV_SYMBOL_BATTERY_EMPTY;
+  else if (pct < 30)
+    icon = LV_SYMBOL_BATTERY_1;
+  else if (pct < 60)
+    icon = LV_SYMBOL_BATTERY_2;
+  else if (pct < 90)
+    icon = LV_SYMBOL_BATTERY_3;
+
+  // Combine icon and text to prevent overlap
+  String batStr =
+      String(icon) + "  " + String(pct) + "% (" + String(voltage, 2) + "V)";
   lv_label_set_text(ui_status_label_bat, batStr.c_str());
 }
 
@@ -119,16 +133,17 @@ void build_ui() {
   lv_obj_set_style_radius(ui_status_bar, 0, 0);
   lv_obj_set_style_border_width(ui_status_bar, 0, 0);
 
-  // Status Labels (Row layout manually for now)
+  // Status Labels
   ui_status_label_wifi = lv_label_create(ui_status_bar);
   lv_label_set_text(ui_status_label_wifi, "Connecting...");
   lv_obj_set_style_text_color(ui_status_label_wifi, lv_color_white(), 0);
   lv_obj_align(ui_status_label_wifi, LV_ALIGN_LEFT_MID, 5, 0);
 
+  // Battery Group (Now consolidated)
   ui_status_label_bat = lv_label_create(ui_status_bar);
   lv_label_set_text(ui_status_label_bat, "Bat: --%");
   lv_obj_set_style_text_color(ui_status_label_bat, lv_color_white(), 0);
-  lv_obj_align(ui_status_label_bat, LV_ALIGN_RIGHT_MID, -5, 0);
+  lv_obj_align(ui_status_label_bat, LV_ALIGN_RIGHT_MID, -10, 0);
 
   // 2. Main Content (Top, Black)
   ui_content_area = lv_obj_create(scr);
@@ -143,21 +158,25 @@ void build_ui() {
   ui_city_label = lv_label_create(ui_content_area);
   lv_obj_set_style_text_font(ui_city_label, &lv_font_montserrat_28, 0);
   lv_obj_set_style_text_color(ui_city_label, lv_color_white(), 0);
-  lv_obj_align(ui_city_label, LV_ALIGN_CENTER, 0, -40);
+  lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 10); // Higher offset
+  lv_label_set_text(ui_city_label, "Loading...");
 
   // Temp Label
   ui_temp_label = lv_label_create(ui_content_area);
-  lv_obj_set_style_text_font(ui_temp_label, &lv_font_montserrat_28,
-                             0); // Reuse 28 or need bigger? 28 is decent.
+  lv_obj_set_style_text_font(ui_temp_label, &lv_font_montserrat_40, 0);
   lv_obj_set_style_text_color(ui_temp_label, lv_palette_main(LV_PALETTE_YELLOW),
                               0);
-  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 0,
+               0); // Center instead of off-center
+  lv_label_set_text(ui_temp_label, "--°F");
 
   // Condition Label
   ui_cond_label = lv_label_create(ui_content_area);
-  lv_obj_set_style_text_font(ui_cond_label, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(ui_cond_label, lv_color_white(), 0);
-  lv_obj_align(ui_cond_label, LV_ALIGN_CENTER, 0, 30);
+  lv_obj_set_style_text_font(ui_cond_label, &lv_font_montserrat_18, 0);
+  lv_obj_set_style_text_color(ui_cond_label,
+                              lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
+  lv_obj_align(ui_cond_label, LV_ALIGN_BOTTOM_MID, 0, -10); // Lower offset
+  lv_label_set_text(ui_cond_label, "---");
 
   // 3. Gestures
   lv_obj_add_event_cb(scr, gesture_event_cb, LV_EVENT_GESTURE, NULL);

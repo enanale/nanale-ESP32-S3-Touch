@@ -29,12 +29,35 @@ void BatteryManager::update() {
 float BatteryManager::getVoltage() { return _voltage; }
 
 int BatteryManager::getPercentage() {
-  // Simple LiPo estimation
-  // 4.2V = 100%, 3.3V = 0%
+  // 18650 Lithium Battery Discharge Curve (Typical)
+  // 4.2V = 100%
+  // 4.1V = 90%
+  // 4.0V = 80%
+  // 3.9V = 60%
+  // 3.8V = 40%
+  // 3.7V = 20%
+  // 3.6V = 10%
+  // 3.5V = 5%
+  // 3.3V = 0%
+
   if (_voltage >= 4.2)
     return 100;
-  if (_voltage <= 3.3)
-    return 0;
+  if (_voltage >= 4.1)
+    return 90 + (_voltage - 4.1) * 100;
+  if (_voltage >= 4.0)
+    return 80 + (_voltage - 4.0) * 100;
+  if (_voltage >= 3.9)
+    return 60 + (_voltage - 3.9) * 200;
+  if (_voltage >= 3.8)
+    return 40 + (_voltage - 3.8) * 200;
+  if (_voltage >= 3.7)
+    return 20 + (_voltage - 3.7) * 200;
+  if (_voltage >= 3.6)
+    return 10 + (_voltage - 3.6) * 100;
+  if (_voltage >= 3.5)
+    return 5 + (_voltage - 3.5) * 50;
+  if (_voltage >= 3.3)
+    return (_voltage - 3.3) * 25;
 
-  return static_cast<int>(((_voltage - 3.3) / (4.2 - 3.3)) * 100);
+  return 0;
 }
