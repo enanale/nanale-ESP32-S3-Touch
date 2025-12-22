@@ -30,26 +30,26 @@ static unsigned long last_weather_update = 0;
 
 // Helper: Check Power Button
 void check_power_button() {
-  if (digitalRead(EXAMPLE_PIN_NUM_PWR_BTN) == LOW) {
+  if (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
     // Debounce
     delay(50);
-    if (digitalRead(EXAMPLE_PIN_NUM_PWR_BTN) == LOW) {
+    if (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
       Serial.println("[PWR] Button Pressed -> Going to Sleep...");
 
       lvgl_port_set_backlight(false);
 
-      while (digitalRead(EXAMPLE_PIN_NUM_PWR_BTN) == LOW) {
+      while (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
         delay(10);
       }
       delay(50);
 
-      esp_sleep_enable_ext0_wakeup((gpio_num_t)EXAMPLE_PIN_NUM_PWR_BTN, 0);
+      esp_sleep_enable_ext0_wakeup((gpio_num_t)EXAMPLE_PIN_NUM_PWR_STAT, 0);
       esp_light_sleep_start();
 
       Serial.println("[PWR] Woke up!");
       lvgl_port_set_backlight(true);
 
-      while (digitalRead(EXAMPLE_PIN_NUM_PWR_BTN) == LOW) {
+      while (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
         delay(10);
       }
     }
@@ -92,8 +92,13 @@ void update_status_bar() {
     icon = LV_SYMBOL_BATTERY_3;
 
   // Combine icon and text to prevent overlap
-  String batStr =
-      String(icon) + "  " + String(pct) + "% (" + String(voltage, 2) + "V)";
+  String batStr = String(icon);
+
+  // DEBUG INFO for user to see without Serial Monitor
+  char debug_buf[64];
+  snprintf(debug_buf, sizeof(debug_buf), " %d%% (%.2fV)", pct, voltage);
+  batStr += debug_buf;
+
   lv_label_set_text(ui_status_label_bat, batStr.c_str());
 }
 
@@ -204,8 +209,8 @@ void setup() {
   netMgr.begin();
   batMgr.begin();
 
-  // Initialize power button pin
-  pinMode(EXAMPLE_PIN_NUM_PWR_BTN, INPUT_PULLUP);
+  // Initialize power status pin
+  pinMode(EXAMPLE_PIN_NUM_PWR_STAT, INPUT);
 }
 
 void loop() {

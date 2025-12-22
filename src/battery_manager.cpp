@@ -1,6 +1,10 @@
 #include "battery_manager.h"
 
-BatteryManager::BatteryManager() : _voltage(0.0), _lastUpdate(0) {}
+#include "user_config.h"
+#include <Wire.h>
+
+BatteryManager::BatteryManager()
+    : _voltage(0.0), _lastUpdate(0), _isCharging(false) {}
 
 void BatteryManager::begin() {
   // ADC is initialized automatically by analogRead in Arduino
@@ -8,21 +12,12 @@ void BatteryManager::begin() {
 }
 
 void BatteryManager::update() {
-  if (millis() - _lastUpdate > 30000) { // Update every 30 seconds
+  if (millis() - _lastUpdate > 2000) {
     _lastUpdate = millis();
-
-    // Read raw value (0-4095)
     int raw = analogRead(_pin);
-
-    // Calculation: (Raw / 4095.0) * 3.3V_Ref * 3.0_Multiplier
-    // Filter slightly to reduce noise? For now, raw is fine or simple average.
     _voltage = (raw / 4095.0) * 3.3 * 3.0;
 
-    // Optional: Simple smoothing
-    // static float smoothed = 0;
-    // if (smoothed == 0) smoothed = _voltage;
-    // smoothed = (smoothed * 0.8) + (_voltage * 0.2);
-    // _voltage = smoothed;
+    Serial.printf("[BATT] Volts: %.2fV\n", _voltage);
   }
 }
 
@@ -30,16 +25,6 @@ float BatteryManager::getVoltage() { return _voltage; }
 
 int BatteryManager::getPercentage() {
   // 18650 Lithium Battery Discharge Curve (Typical)
-  // 4.2V = 100%
-  // 4.1V = 90%
-  // 4.0V = 80%
-  // 3.9V = 60%
-  // 3.8V = 40%
-  // 3.7V = 20%
-  // 3.6V = 10%
-  // 3.5V = 5%
-  // 3.3V = 0%
-
   if (_voltage >= 4.2)
     return 100;
   if (_voltage >= 4.1)

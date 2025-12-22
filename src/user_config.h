@@ -11,6 +11,12 @@
 #define Touch_SCL_NUM (GPIO_NUM_18)
 #define Touch_SDA_NUM (GPIO_NUM_17)
 
+// System I2C Pins (Port 0 - for TCA9554)
+#define SYS_SCL_NUM (GPIO_NUM_48)
+#define SYS_SDA_NUM (GPIO_NUM_47)
+#define TCA9554_ADDR 0x20
+#define TCA9554_PIN_PWR_LATCH 6
+
 // Display QSPI Pins
 #define EXAMPLE_PIN_NUM_LCD_CS (GPIO_NUM_9)
 #define EXAMPLE_PIN_NUM_LCD_PCLK (GPIO_NUM_10)
@@ -20,7 +26,8 @@
 #define EXAMPLE_PIN_NUM_LCD_DATA3 (GPIO_NUM_14)
 #define EXAMPLE_PIN_NUM_LCD_RST (GPIO_NUM_21)
 #define EXAMPLE_PIN_NUM_BK_LIGHT 8
-#define EXAMPLE_PIN_NUM_PWR_BTN (GPIO_NUM_16)
+#define EXAMPLE_PIN_NUM_PWR_STAT                                               \
+  (GPIO_NUM_16) // Power/Charging status pin from demo
 
 // Resolution
 #define EXAMPLE_LCD_H_RES 172

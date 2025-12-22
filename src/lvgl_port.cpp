@@ -109,77 +109,61 @@ static SemaphoreHandle_t flush_done_semaphore = NULL;
 // Rotation Buffer
 static uint8_t *lvgl_dest = NULL;
 
-// TCA9554PWR Address
-#define TCA9554_ADDR 0x20
+// TCA9554PWR on Wire1 (Pins 47/48)
+// Address already defined in user_config.h as 0x20
 
-static void i2c_scan(void) {
-  ESP_LOGI(TAG, "Scanning I2C bus...");
+static void i2c_scan(TwoWire &wire, const char *bus_name) {
+  ESP_LOGI(TAG, "Scanning %s I2C bus...", bus_name);
   byte error, address;
   int nDevices = 0;
   for (address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
+    wire.beginTransmission(address);
+    error = wire.endTransmission();
     if (error == 0) {
-      ESP_LOGI(TAG, "I2C device found at address 0x%02x !", address);
+      ESP_LOGI(TAG, "[I2C] %s device found at address 0x%02x", bus_name,
+               address);
       nDevices++;
     } else if (error == 4) {
-      ESP_LOGW(TAG, "Unknown error at address 0x%02x", address);
+      ESP_LOGW(TAG, "[I2C] %s unknown error at 0x%02x", bus_name, address);
     }
   }
   if (nDevices == 0)
-    ESP_LOGE(TAG, "No I2C devices found\n");
-  else
-    ESP_LOGI(TAG, "done\n");
+    ESP_LOGE(TAG, "[I2C] No devices found on %s\n", bus_name);
 }
 
 static void enable_display_power(void) {
-  ESP_LOGI(TAG, "Initializing TCA9554PWR (IO Expander)...");
+  ESP_LOGI(TAG, "Initializing TCA9554PWR on System Bus...");
 
-  // Power Cycle / Stability
-  // Force Pins to Input Pullup first to ensure bus is high
-  pinMode(Touch_SDA_NUM, INPUT_PULLUP);
-  pinMode(Touch_SCL_NUM, INPUT_PULLUP);
-  delay(10);
+  // System I2C on Wire1
+  Wire1.begin(SYS_SDA_NUM, SYS_SCL_NUM, 100000);
+  delay(100);
 
-  Wire.begin(Touch_SDA_NUM, Touch_SCL_NUM);
-  Wire.setClock(10000); // Slow down to 10kHz for stability
-  delay(50);
+  i2c_scan(Wire1, "System (Wire1)");
 
-  i2c_scan(); // Scan first to confirm device
+  // Config: Set Pin 6 as Output (Power Latch), others as Input
+  // Bit 6 = 0 (Output), others = 1 (Input) -> 0xBF
+  Wire1.beginTransmission(TCA9554_ADDR);
+  Wire1.write(0x03);
+  Wire1.write(0xBF);
+  byte err = Wire1.endTransmission();
 
-  // Config: Set P1/P2 Output
-  Wire.beginTransmission(TCA9554_ADDR);
-  Wire.write(0x03);
-  Wire.write(0x00);
-  byte err = Wire.endTransmission();
   if (err != 0) {
     ESP_LOGE(TAG, "TCA9554 Config Failed! Error: %d", err);
-    // Try Alternative Address 0x38 just in case
-    Wire.beginTransmission(0x38);
-    Wire.write(0x03);
-    Wire.write(0x00);
-    if (Wire.endTransmission() == 0) {
-      ESP_LOGI(TAG, "FOUND TCA9554 AT 0x38! UPDATING ADDR.");
-      // We can't easily update the macro, but we can continue here
-      Wire.beginTransmission(0x38);
-      Wire.write(0x01);
-      Wire.write(0xFF);
-      Wire.endTransmission();
-      return;
+  } else {
+    // Output: Set Bit 6 HIGH to latch power
+    Wire1.beginTransmission(TCA9554_ADDR);
+    Wire1.write(0x01); // Output port
+    Wire1.write(0xFF); // Set all high (Pin 6 will be high)
+    err = Wire1.endTransmission();
+    if (err == 0) {
+      ESP_LOGI(TAG, "TCA9554PWR Power Latch Set (Success)");
     }
-    return;
   }
 
-  // Output: Set High
-  Wire.beginTransmission(TCA9554_ADDR);
-  Wire.write(0x01);
-  Wire.write(0xFF);
-  err = Wire.endTransmission();
-  if (err != 0) {
-    ESP_LOGE(TAG, "TCA9554 Output Failed! Error: %d", err);
-  } else {
-    ESP_LOGI(TAG, "TCA9554PWR Power/RST Set High (Success)");
-  }
+  // Also ensure Wire (Touch Bus) is initialized
+  Wire.begin(Touch_SDA_NUM, Touch_SCL_NUM);
+  Wire.setClock(400000);
+  i2c_scan(Wire, "Touch (Wire)");
 
   vTaskDelay(pdMS_TO_TICKS(120));
 }

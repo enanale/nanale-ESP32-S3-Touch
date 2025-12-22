@@ -34,7 +34,8 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
     * **Voltage Multiplier:** 3.0x
     * **Battery Type:** 3.7V Lithium 18650
     * **Discharge Handling:** Requires a non-linear mapping (discharge curve) for accurate percentage calculation (e.g., 3.6V-3.9V range is non-linear).
-    * **Charging Status:** No software-readable flag found on TCA9554 or direct GPIO in standard demo; monitor voltage trends instead.
+    * **Charging Status:** **HARDWARE LIMITATION**. The ETA6098 STAT pin (Pin 9) is connected only to an LED and is **not** wired to any ESP32 GPIO or IO Expander pin. Software cannot detect charging state or USB presence on this board revision.
+    * **Schematic:** [ESP32-S3-Touch-LCD-3.49 Schematic](https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-3.49/ESP32-S3-Touch-LCD-3.49-Schematic.pdf)
 
 ## **3\. Pin Definitions & GPIO Mapping**
 

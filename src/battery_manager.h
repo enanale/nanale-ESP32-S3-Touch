@@ -14,6 +14,7 @@ public:
 private:
   float _voltage;
   unsigned long _lastUpdate;
+  bool _isCharging;
   const int _pin = 4; // GPIO 4 confirmed from vendor code
 };
 
