@@ -11,6 +11,61 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 
 ## **2\. Hardware Specifications**
 
+### GPIO Pinout
+
+| GPIO | LCD | SD Card | IMU | RTC | UART | I2S | KEY_IO | OUTPUT | Other |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| IO0 | | | | | | | BOOT0 | IO0 | |
+| IO1 | | | | | | | | IO1 | |
+| IO2 | | | | | | | | IO2 | |
+| IO3 | | | | | | | | IO3 | |
+| IO4 | | | | | | | | IO4 | BAT_ADC |
+| IO5 | | | | | | | | IO5 | |
+| IO6 | | | | | | I2S_DSOUT | | IO6 | |
+| IO7 | | | | | | I2S_MCLK | | IO7 | |
+| IO8 | LCD_BL | | | | | | | | |
+| IO9 | LCD_CS | | | | | | | | |
+| IO10 | LCD_SCL | | | | | | | | |
+| IO11 | LCD_D0 | | | | | | | | |
+| IO12 | LCD_D1 | | | | | | | | |
+| IO13 | LCD_D2 | | | | | | | | |
+| IO14 | LCD_D3 | | | | | | | | |
+| IO15 | | | | | | I2S_SCLK | | IO15 | |
+| IO16 | | | | | | | | IO16 | SYS_OUT |
+| IO17 | TP_SDA | | | | | | | IO17 | |
+| IO18 | TP_SCL | | | | | | | IO18 | |
+| IO19 | | | | | | | | IO19 | U_N |
+| IO20 | | | | | | | | IO20 | U_P |
+| IO21 | LCD_RST | | | | | | | IO21 | |
+| IO38 | | SD_CS | | | | | | IO38 | |
+| IO39 | | SD_MOSI | | | | | | IO39 | |
+| IO40 | | SD_MISO | | | | | | IO40 | |
+| IO41 | | SD_SCLK | | | | | | IO41 | |
+| IO42 | | | | | | | | IO42 | EXIO_INT |
+| IO43 | | | | | TXD | | | IO43 | |
+| IO44 | | | | | RXD | | | IO44 | |
+| IO45 | | | | | | I2S_DSDIN | | IO45 | |
+| IO46 | | | | | | I2S_LRCK | | IO46 | |
+| IO47 | | | IMU_SDA | RTC_SDA | | Audio_SDA | | IO47 | |
+| IO48 | | | IMU_SCL | RTC_SCL | | Audio_SCL | | IO48 | |
+| RESET | | | | | | | RESET | | |
+| EXIO0 | TP_INT | | | | | | | EXIO0 | |
+| EXIO1 | BL_EN | | | | | | | EXIO1 | |
+| EXIO2 | | | IMU_INT1 | | | | | EXIO2 | |
+| EXIO3 | | | IMU_INT2 | | | | | EXIO3 | |
+| EXIO4 | | | | RTC_INT | | | | EXIO4 | |
+| EXIO5 | LCD_TE | | | | | | | EXIO5 | |
+| EXIO6 | | | | | | | | EXIO6 | SYS_EN |
+| EXIO7 | | | | | | NS_MODE | | EXIO7 | |
+
+**Key Notes from the Table**
+
+* Shared Bus (I2C): Notice that IO47 and IO48 are heavily shared, carrying signals for the IMU, RTC, and Audio (I2S) simultaneously.
+
+* Extended IO: The pins labeled EXIO likely refer to an IO Expander, meaning these are not direct GPIOs on the main MCU but are accessed via a separate interface (likely I2C).
+
+* USB: IO19 and IO20 are marked U_N and U_P, indicating USB Negative and Positive differential data lines.
+
 ### **Display System**
 
 * **Panel Type:** IPS LCD  

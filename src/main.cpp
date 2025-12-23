@@ -9,11 +9,21 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "motion_manager.h"
+#include "power_manager.h"
+
 // Globals
 AppNetworkManager netMgr;
 WeatherManager weatherMgr;
 BatteryManager batMgr;
+MotionManager motMgr;
+PowerManager pwrMgr;
 lv_obj_t *info_label = NULL;
+
+// Persist city index across deep sleep reboots
+static int RTC_DATA_ATTR rtc_city_index = 0;
+static int current_city_index = 0; // Local copy
+static unsigned long last_weather_update = 0;
 
 // UI Objects
 static lv_obj_t *ui_status_bar = NULL;
@@ -24,9 +34,6 @@ static lv_obj_t *ui_content_area = NULL;
 static lv_obj_t *ui_city_label = NULL;
 static lv_obj_t *ui_temp_label = NULL;
 static lv_obj_t *ui_cond_label = NULL;
-
-static int current_city_index = 0;
-static unsigned long last_weather_update = 0;
 
 // Helper: Check Power Button
 void check_power_button() {
@@ -43,7 +50,8 @@ void check_power_button() {
       }
       delay(50);
 
-      esp_sleep_enable_ext0_wakeup((gpio_num_t)EXAMPLE_PIN_NUM_PWR_STAT, 0);
+      esp_sleep_enable_ext1_wakeup((1ULL << 16) | (1ULL << 42),
+                                   ESP_EXT1_WAKEUP_ANY_LOW);
       esp_light_sleep_start();
 
       Serial.println("[PWR] Woke up!");
@@ -114,14 +122,18 @@ static void gesture_event_cb(lv_event_t *e) {
     current_city_index++;
     if (current_city_index >= 3)
       current_city_index = 0;
+    rtc_city_index = current_city_index; // Persist
     update_weather_ui();
+    pwrMgr.resetTimer(); // Reset sleep timer
     Serial.println("Swipe LEFT -> Next City");
   } else if (dir == LV_DIR_RIGHT) {
     // Prev City
     current_city_index--;
     if (current_city_index < 0)
       current_city_index = 2;
+    rtc_city_index = current_city_index; // Persist
     update_weather_ui();
+    pwrMgr.resetTimer(); // Reset sleep timer
     Serial.println("Swipe RIGHT -> Prev City");
   }
 }
@@ -148,23 +160,21 @@ void build_ui() {
   ui_status_label_bat = lv_label_create(ui_status_bar);
   lv_label_set_text(ui_status_label_bat, "Bat: --%");
   lv_obj_set_style_text_color(ui_status_label_bat, lv_color_white(), 0);
-  lv_obj_align(ui_status_label_bat, LV_ALIGN_RIGHT_MID, -10, 0);
+  lv_obj_align(ui_status_label_bat, LV_ALIGN_RIGHT_MID, -5, 0);
 
-  // 2. Main Content (Top, Black)
+  // 2. Main Content Area
   ui_content_area = lv_obj_create(scr);
-  lv_obj_set_size(ui_content_area, LV_PCT(100),
-                  142); // 172 total - 30 status = 142
+  lv_obj_set_size(ui_content_area, LV_PCT(100), LV_PCT(85));
   lv_obj_align(ui_content_area, LV_ALIGN_TOP_MID, 0, 0);
   lv_obj_set_style_bg_color(ui_content_area, lv_color_black(), 0);
   lv_obj_set_style_border_width(ui_content_area, 0, 0);
-  lv_obj_remove_flag(ui_content_area, LV_OBJ_FLAG_SCROLLABLE);
 
   // City Label
   ui_city_label = lv_label_create(ui_content_area);
   lv_obj_set_style_text_font(ui_city_label, &lv_font_montserrat_28, 0);
   lv_obj_set_style_text_color(ui_city_label, lv_color_white(), 0);
-  lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 10); // Higher offset
-  lv_label_set_text(ui_city_label, "Loading...");
+  lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 20);
+  lv_label_set_text(ui_city_label, "City");
 
   // Temp Label
   ui_temp_label = lv_label_create(ui_content_area);
@@ -209,14 +219,29 @@ void setup() {
   netMgr.begin();
   batMgr.begin();
 
+  // Restore state from RTC memory
+  current_city_index = rtc_city_index;
+
   // Initialize power status pin
   pinMode(EXAMPLE_PIN_NUM_PWR_STAT, INPUT);
+
+  // Initialize managers
+  motMgr.begin();
+  pwrMgr.begin();
 }
 
 void loop() {
-  check_power_button(); // Check power button for sleep
+  check_power_button(); // Manual sleep check
 
-  // Update Battery (Every 30s handled internally, but we need to update UI)
+  // Check for motion to reset sleep timer
+  if (motMgr.hasSignificantMotion()) {
+    pwrMgr.resetTimer();
+  }
+
+  // Handle auto-sleep logic
+  pwrMgr.update();
+
+  // Update Battery (Every 30s handled internally)
   batMgr.update();
 
   static unsigned long last_ui_update = 0;

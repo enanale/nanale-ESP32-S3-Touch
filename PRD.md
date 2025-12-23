@@ -38,15 +38,18 @@ A portable, battery-powered weather display station running on the Waveshare ESP
     - Information to display: City Name, Temperature, Conditions (e.g., "Clear", "Rain").
 
 ### 3.4 Power Management
-- **Power Button:** Side button (GPIO 16).
-- **Functionality:**
-    - **Single Press:** Toggle between Active and Sleep Mode.
-    - **Sleep Mode:**
-        - Turn off Display Backlight immediately.
-        - Enter `Light Sleep` to conserve power.
-    - **Wake Mode:**
-        - Resume instantly.
-        - Turn on Display Backlight.
+- **Hardware Trigger:** GPIO 16 (Power Button / Touch Interrupt).
+- **Auto-Sleep Logic:**
+    - `PowerManager` tracks `lastActivityTime` (Touch or Motion).
+    - If `millis() - lastActivityTime > 60000`, enter Deep Sleep.
+- **Motion Reset:** `MotionManager` polls QMI8658; resets `lastActivityTime` if delta > 0.15g.
+- **Backlight Coordinated Control:**
+    - Turn off GPIO 8 (Active Low PWM).
+    - Disable EXIO 1 (Active High BL_EN via TCA9554 expander).
+- **Deep Sleep Implementation:**
+    - `esp_sleep_enable_ext0_wakeup(GPIO_NUM_16, 0)`.
+    - `esp_deep_sleep_start()`.
+    - Note: Device reboots on wakeup, state is preserved via `RTC_DATA_ATTR`.
 
 ### 3.5 UI Enhancements [NEW]
 - **Status Bar:**
@@ -60,7 +63,7 @@ A portable, battery-powered weather display station running on the Waveshare ESP
     - **Content:** City Name, Temperature, Condition.
 - **Interaction:**
     - **Gesture:** Swipe Left/Right anywhere on the screen.
-    - **Action:** Switch between the 3 configured cities (Oakland <-> SF <-> Mountain View).
+    - **Action:** Switch between the 3 configured cities (Oakland <-> SF <-> Mountain View). [VERIFIED]
 
 ## 4. Success Metrics
 - Device boots and shows splash screen.

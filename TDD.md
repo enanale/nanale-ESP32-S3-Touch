@@ -51,8 +51,8 @@
     - Create `src/hal/display_hal.cpp` (QSPI + LVGL Buffer setup).
 3.  **Display Verification:**
     - Draw a simple red screen or LVGL label to prove the driver works.
-4.  **Touch Verification:**
-    - Log touch coordinates to Serial.
+4.  **Touch Verification:** [SUCCESS]
+    - Log touch coordinates to Serial. [VERIFIED]
 5.  **UI Build:**
     - Implement the Hello World Splash using LVGL.
     - Implement the Status Bar.
@@ -118,7 +118,8 @@ platformio.ini      # Dependencies and board config
 ## 6. Implementation Roadmap
 1. **Project Init:** Setup PlatformIO with `Arduino_GFX` and `ArduinoJson`.
 2. **Drivers:** Get screen generic "Red/Green/Blue" test working (verifies IO Expander + QSPI).
-3. **UI - Step 1:** "Hello World" Splash.
-4. **Network:** Connect to WiFi and print status to Serial.
-5. **Integration:** Fetch dummy weather -> Parse -> Scroll on screen.
-6. **Refinement:** Battery monitoring and error handling.
+3. **UI - Step 1:** "Hello World" Splash. [DONE]
+4. **Touch Input:** Integrated with gesture support. [DONE]
+5. **Network:** Connect to WiFi and print status to Serial. [DONE]
+6. **Integration:** Fetch dummy weather -> Parse -> Scroll on screen. [DONE]
+7. **Refinement:** Battery monitoring and error handling. [DONE]

@@ -21,6 +21,7 @@
 // Globals
 static const char *TAG = "lvgl_port";
 static SemaphoreHandle_t lvgl_mux = NULL;
+static uint8_t tca9554_output_state = 0xFF; // Default all ON
 
 // Hardware Config
 #define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
@@ -42,7 +43,6 @@ static SemaphoreHandle_t lvgl_mux = NULL;
 #define TOUCH_RES_X 172
 #define TOUCH_RES_Y 640
 
-static SemaphoreHandle_t lvgl_mutex = NULL;
 static lv_display_t *display = NULL;
 static lv_indev_t *indev_touch = NULL;
 
@@ -140,23 +140,26 @@ static void enable_display_power(void) {
 
   i2c_scan(Wire1, "System (Wire1)");
 
-  // Config: Set Pin 6 as Output (Power Latch), others as Input
-  // Bit 6 = 0 (Output), others = 1 (Input) -> 0xBF
+  // Config: Set Pin 1 (BL_EN), Pin 6 (SYS_EN), Pin 7 (NS_MODE) as Output
+  // others as Input.
+  // Bits: 7=0, 6=0, 5=1, 4=1, 3=1, 2=1, 1=0, 0=1 -> 0x3D
   Wire1.beginTransmission(TCA9554_ADDR);
-  Wire1.write(0x03);
-  Wire1.write(0xBF);
+  Wire1.write(0x03); // Config register
+  Wire1.write(0x3D);
   byte err = Wire1.endTransmission();
 
   if (err != 0) {
     ESP_LOGE(TAG, "TCA9554 Config Failed! Error: %d", err);
   } else {
     // Output: Set Bit 6 HIGH to latch power
+    // Pin 1 = BL_EN, Pin 6 = SYS_EN, Pin 7 = NS_MODE
+    tca9554_output_state = (1 << 6) | (1 << 1) | (1 << 7);
     Wire1.beginTransmission(TCA9554_ADDR);
     Wire1.write(0x01); // Output port
-    Wire1.write(0xFF); // Set all high (Pin 6 will be high)
+    Wire1.write(tca9554_output_state);
     err = Wire1.endTransmission();
     if (err == 0) {
-      ESP_LOGI(TAG, "TCA9554PWR Power Latch Set (Success)");
+      ESP_LOGI(TAG, "TCA9554PWR Power Latch & BL_EN Set (Success)");
     }
   }
 
@@ -325,13 +328,6 @@ static void example_lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area,
 // -------------------------------------------------------------------------
 // Helper: Touch Read
 // -------------------------------------------------------------------------
-static void TouchInputReadCallback(lv_indev_t *indev, lv_indev_data_t *data) {
-  // Placeholder for touch logic.
-  // If you have strict I2C drivers, put them here.
-  // For now, let's keep it safe and empty or minimal to avoid I2C crashes if
-  // not ready.
-  data->state = LV_INDEV_STATE_RELEASED;
-}
 
 // -------------------------------------------------------------------------
 // Lock / Unlock
@@ -345,9 +341,8 @@ bool lvgl_lock(int timeout_ms) {
 }
 
 void lvgl_unlock(void) {
-  if (!lvgl_mux)
-    return;
-  xSemaphoreGive(lvgl_mux);
+  if (lvgl_mux)
+    xSemaphoreGive(lvgl_mux);
 }
 
 // -------------------------------------------------------------------------
@@ -385,9 +380,27 @@ static const axs15231b_lcd_init_cmd_t lcd_init_cmds[] = {
 // Helper: Backlight Control (Active Low)
 // -------------------------------------------------------------------------
 void lvgl_port_set_backlight(bool on) {
-  // Active Low: 0 = ON, 1 = OFF
+  // 1. Primary Backlight Pin (IO 8) - Active Low
   gpio_set_level((gpio_num_t)EXAMPLE_PIN_NUM_BK_LIGHT, on ? 0 : 1);
-  ESP_LOGI(TAG, "Backlight Set: %s", on ? "ON" : "OFF");
+
+  // 2. Hardware Enable Pin (EXIO 1) - Active High
+  if (on) {
+    tca9554_output_state |= (1 << 1);
+  } else {
+    tca9554_output_state &= ~(1 << 1);
+  }
+
+  Wire1.beginTransmission(TCA9554_ADDR);
+  Wire1.write(0x01); // Output port
+  Wire1.write(tca9554_output_state);
+  byte err = Wire1.endTransmission();
+
+  if (err == 0) {
+    ESP_LOGI(TAG, "Backlight coordinated: IO8=%s, EXIO1=%s",
+             (on ? "ON" : "OFF"), (on ? "EN" : "DIS"));
+  } else {
+    ESP_LOGE(TAG, "Expander Backlight Set Failed! Error: %d", err);
+  }
 }
 
 void lvgl_port_init(void) {
@@ -518,12 +531,6 @@ void lvgl_port_init(void) {
                          LV_DISPLAY_RENDER_MODE_FULL);
   lv_display_set_flush_cb(disp, example_lvgl_flush_cb);
   lv_display_set_user_data(disp, panel);
-
-  // 4. Peripherals
-  // Touch (Disabled for now to isolate display)
-  // lv_indev_t *touch = lv_indev_create();
-  // lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
-  // lv_indev_set_read_cb(touch, TouchInputReadCallback);
 
   // 5. Timer
   const esp_timer_create_args_t periodic_timer_args = {
