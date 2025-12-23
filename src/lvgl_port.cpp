@@ -1,4 +1,5 @@
 #include "lvgl_port.h"
+#include "audio_manager.h" // Added AudioManager
 #include "axs15231b/esp_lcd_axs15231b.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -53,6 +54,7 @@ void touch_init(void) {
 }
 
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
+  extern AudioManager audioMgr; // Declare audioMgr inside the function scope
   uint8_t buff[32] = {0};
 
   Wire.beginTransmission(TOUCH_I2C_ADDR);
@@ -78,8 +80,16 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     // Coordinate Mapping: Landscape 270 deg
     data->point.x = pointY;
     data->point.y = LCD_V_RES - pointX;
+
+    static uint8_t last_state = LV_INDEV_STATE_RELEASED;
+    if (last_state == LV_INDEV_STATE_RELEASED) {
+      audioMgr.playClick();
+    }
+    last_state = LV_INDEV_STATE_PRESSED;
   } else {
     data->state = LV_INDEV_STATE_RELEASED;
+    static uint8_t last_state = LV_INDEV_STATE_RELEASED;
+    last_state = LV_INDEV_STATE_RELEASED;
   }
 }
 

@@ -35,6 +35,13 @@
 #define PIN_UART_TX (GPIO_NUM_43)
 #define PIN_UART_RX (GPIO_NUM_44)
 
+// I2S Audio
+#define PIN_I2S_MCLK (GPIO_NUM_2)
+#define PIN_I2S_SCLK (GPIO_NUM_3)
+#define PIN_I2S_LRCK (GPIO_NUM_5)
+#define PIN_I2S_DOUT (GPIO_NUM_4)
+#define PIN_I2S_DIN (GPIO_NUM_6)
+
 // -------------------------------------------------------------------------
 // Hardware Constants
 // -------------------------------------------------------------------------
@@ -44,6 +51,8 @@
 #define RTC_I2C_ADDR 0x51
 #define TOUCH_I2C_ADDR 0x3B
 #define TCA9554_ADDR 0x20
+#define ES8311_I2C_ADDR 0x18
+#define ES7210_I2C_ADDR 0x40
 
 // IO Expander (TCA9554) Output Pins
 #define EXIO_BL_EN 1

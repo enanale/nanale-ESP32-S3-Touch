@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "audio_manager.h" // Added AudioManager
 #include "motion_manager.h"
 #include "power_manager.h"
 #include "time_manager.h" // Added TimeManager include
@@ -19,7 +20,8 @@ WeatherManager weatherMgr;
 BatteryManager batMgr;
 MotionManager motMgr;
 PowerManager pwrMgr;
-TimeManager timeMgr; // Added TimeManager global
+TimeManager timeMgr;   // Added TimeManager global
+AudioManager audioMgr; // Added AudioManager global
 lv_obj_t *info_label = NULL;
 
 // Persist city index across deep sleep reboots
@@ -207,6 +209,8 @@ void setup() {
   netMgr.begin();
   batMgr.begin();
   timeMgr.begin();
+  audioMgr.begin();      // Initialize Audio
+  audioMgr.playJingle(); // Play startup jingle
 
   current_city_index = rtc_city_index;
 
