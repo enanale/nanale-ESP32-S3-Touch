@@ -37,29 +37,20 @@ static lv_obj_t *ui_cond_label = NULL;
 
 // Helper: Check Power Button
 void check_power_button() {
-  if (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
+  if (digitalRead(PIN_USER_KEY) == LOW) {
     // Debounce
     delay(50);
-    if (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
+    if (digitalRead(PIN_USER_KEY) == LOW) {
       Serial.println("[PWR] Button Pressed -> Going to Sleep...");
 
       lvgl_port_set_backlight(false);
+      delay(100);
 
-      while (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
+      while (digitalRead(PIN_USER_KEY) == LOW) {
         delay(10);
       }
       delay(50);
-
-      esp_sleep_enable_ext1_wakeup((1ULL << 16) | (1ULL << 42),
-                                   ESP_EXT1_WAKEUP_ANY_LOW);
-      esp_light_sleep_start();
-
-      Serial.println("[PWR] Woke up!");
-      lvgl_port_set_backlight(true);
-
-      while (digitalRead(EXAMPLE_PIN_NUM_PWR_STAT) == LOW) {
-        delay(10);
-      }
+      pwrMgr.goToDeepSleep();
     }
   }
 }
@@ -101,8 +92,6 @@ void update_status_bar() {
 
   // Combine icon and text to prevent overlap
   String batStr = String(icon);
-
-  // DEBUG INFO for user to see without Serial Monitor
   char debug_buf[64];
   snprintf(debug_buf, sizeof(debug_buf), " %d%% (%.2fV)", pct, voltage);
   batStr += debug_buf;
@@ -181,8 +170,7 @@ void build_ui() {
   lv_obj_set_style_text_font(ui_temp_label, &lv_font_montserrat_40, 0);
   lv_obj_set_style_text_color(ui_temp_label, lv_palette_main(LV_PALETTE_YELLOW),
                               0);
-  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 0,
-               0); // Center instead of off-center
+  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 0, 0);
   lv_label_set_text(ui_temp_label, "--°F");
 
   // Condition Label
@@ -190,7 +178,7 @@ void build_ui() {
   lv_obj_set_style_text_font(ui_cond_label, &lv_font_montserrat_18, 0);
   lv_obj_set_style_text_color(ui_cond_label,
                               lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
-  lv_obj_align(ui_cond_label, LV_ALIGN_BOTTOM_MID, 0, -10); // Lower offset
+  lv_obj_align(ui_cond_label, LV_ALIGN_BOTTOM_MID, 0, -10);
   lv_label_set_text(ui_cond_label, "---");
 
   // 3. Gestures
@@ -203,45 +191,36 @@ void setup() {
   Serial.begin(115200);
 
   // Backlight off during boot
-  lvgl_port_set_backlight(false); // Ensure off during init
+  lvgl_port_set_backlight(false);
 
   lvgl_port_init();
 
-  // Show Splash (or just build UI directly)
   if (lvgl_lock(1000)) {
     build_ui();
     lvgl_unlock();
   }
 
-  // Backlight On
   lvgl_port_set_backlight(true);
 
   netMgr.begin();
   batMgr.begin();
 
-  // Restore state from RTC memory
   current_city_index = rtc_city_index;
 
-  // Initialize power status pin
-  pinMode(EXAMPLE_PIN_NUM_PWR_STAT, INPUT);
+  pinMode(PIN_USER_KEY, INPUT);
 
-  // Initialize managers
   motMgr.begin();
   pwrMgr.begin();
 }
 
 void loop() {
-  check_power_button(); // Manual sleep check
+  check_power_button();
 
-  // Check for motion to reset sleep timer
   if (motMgr.hasSignificantMotion()) {
     pwrMgr.resetTimer();
   }
 
-  // Handle auto-sleep logic
   pwrMgr.update();
-
-  // Update Battery (Every 30s handled internally)
   batMgr.update();
 
   static unsigned long last_ui_update = 0;
@@ -253,7 +232,6 @@ void loop() {
     last_ui_update = millis();
   }
 
-  // Update Weather Data (Every 10 min)
   if (millis() - last_weather_update > 600000 || last_weather_update == 0) {
     if (netMgr.isConnected()) {
       weatherMgr.fetchRealData();

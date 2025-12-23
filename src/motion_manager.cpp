@@ -8,8 +8,8 @@ MotionManager::MotionManager()
 
 bool MotionManager::begin() {
   // QMI8658 is on Wire1 (System Bus)
-  // SDA: 47, SCL: 48
-  if (!qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, SYS_SDA_NUM, SYS_SCL_NUM)) {
+  // SDA is 47, SCL is 48
+  if (!qmi.begin(Wire1, IMU_I2C_ADDR, PIN_I2C_SDA, PIN_I2C_SCL)) {
     Serial.println("[IMU] Failed to find QMI8658");
     return false;
   }

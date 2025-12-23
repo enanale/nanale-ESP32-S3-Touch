@@ -1,6 +1,7 @@
 #ifndef BATTERY_MANAGER_H
 #define BATTERY_MANAGER_H
 
+#include "user_config.h"
 #include <Arduino.h>
 
 class BatteryManager {
@@ -15,7 +16,7 @@ private:
   float _voltage;
   unsigned long _lastUpdate;
   bool _isCharging;
-  const int _pin = 4; // GPIO 4 confirmed from vendor code
+  const int _pin = PIN_BAT_ADC;
 };
 
 #endif

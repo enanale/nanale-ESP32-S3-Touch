@@ -2,50 +2,72 @@
 #define USER_CONFIG_H
 
 #include "driver/gpio.h"
+#include "driver/spi_master.h"
 
-// SPI & I2C Hosts
-// SPI & I2C Hosts
+// -------------------------------------------------------------------------
+// GPIO Pin Assignments (Standard Waveshare Naming)
+// -------------------------------------------------------------------------
+
+// LCD QSPI Interface
+#define PIN_LCD_CS (GPIO_NUM_9)
+#define PIN_LCD_CLK (GPIO_NUM_10)
+#define PIN_LCD_D0 (GPIO_NUM_11)
+#define PIN_LCD_D1 (GPIO_NUM_12)
+#define PIN_LCD_D2 (GPIO_NUM_13)
+#define PIN_LCD_D3 (GPIO_NUM_14)
+#define PIN_LCD_RST (GPIO_NUM_21)
+#define PIN_LCD_BL (GPIO_NUM_8)
+
+// Touch Panel I2C
+#define PIN_TP_SDA (GPIO_NUM_17)
+#define PIN_TP_SCL (GPIO_NUM_18)
+
+// System I2C (IMU, RTC, IO Expander)
+#define PIN_I2C_SDA (GPIO_NUM_47)
+#define PIN_I2C_SCL (GPIO_NUM_48)
+
+// Battery & Power
+#define PIN_BAT_ADC (GPIO_NUM_4)
+#define PIN_USER_KEY (GPIO_NUM_16) // Labeled as Touch_INT / Power Button
+#define PIN_EXIO_INT (GPIO_NUM_42)
+
+// UART
+#define PIN_UART_TX (GPIO_NUM_43)
+#define PIN_UART_RX (GPIO_NUM_44)
+
+// -------------------------------------------------------------------------
+// Hardware Constants
+// -------------------------------------------------------------------------
+
 #define LCD_HOST SPI3_HOST
-
-// Touch I2C Pins (Port 1)
-#define Touch_SCL_NUM (GPIO_NUM_18)
-#define Touch_SDA_NUM (GPIO_NUM_17)
-
-// Power & Sleep
-#define CONFIG_SLEEP_TIMEOUT_SEC 60
-#define EXAMPLE_PIN_NUM_PWR_STAT (GPIO_NUM_16)
-#define EXAMPLE_PIN_NUM_EXIO_INT (GPIO_NUM_42)
-#define EXAMPLE_IMU_ADDR (0x6B)
-
-// System I2C (Wire1)
-#define SYS_SDA_NUM (GPIO_NUM_47)
-#define SYS_SCL_NUM (GPIO_NUM_48)
+#define IMU_I2C_ADDR 0x6B
+#define RTC_I2C_ADDR 0x51
+#define TOUCH_I2C_ADDR 0x3B
 #define TCA9554_ADDR 0x20
-#define TCA9554_PIN_PWR_LATCH 6
 
-// Display QSPI Pins
-#define EXAMPLE_PIN_NUM_LCD_CS (GPIO_NUM_9)
-#define EXAMPLE_PIN_NUM_LCD_PCLK (GPIO_NUM_10)
-#define EXAMPLE_PIN_NUM_LCD_DATA0 (GPIO_NUM_11)
-#define EXAMPLE_PIN_NUM_LCD_DATA1 (GPIO_NUM_12)
-#define EXAMPLE_PIN_NUM_LCD_DATA2 (GPIO_NUM_13)
-#define EXAMPLE_PIN_NUM_LCD_DATA3 (GPIO_NUM_14)
-#define EXAMPLE_PIN_NUM_LCD_RST (GPIO_NUM_21)
-#define EXAMPLE_PIN_NUM_BK_LIGHT 8
+// IO Expander (TCA9554) Output Pins
+#define EXIO_BL_EN 1
+#define EXIO_SYS_EN 6
+#define EXIO_NS_MODE 7
+
 // Resolution
-#define EXAMPLE_LCD_H_RES 172
-#define EXAMPLE_LCD_V_RES 640
-#define LVGL_DMA_BUFF_LEN (EXAMPLE_LCD_H_RES * 64 * 2) // Tuned buffer size
-#define LVGL_SPIRAM_BUFF_LEN (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES * 2)
+#define LCD_H_RES 172
+#define LCD_V_RES 640
 
-// LVGL Task Config
+// -------------------------------------------------------------------------
+// Application Config
+// -------------------------------------------------------------------------
+
+#define CONFIG_SLEEP_TIMEOUT_SEC 60
+
+// LVGL Memory & Task Config
+#define LVGL_DMA_BUFF_LEN (LCD_H_RES * 64 * 2)
+#define LVGL_SPIRAM_BUFF_LEN (LCD_H_RES * LCD_V_RES * 2)
 #define LVGL_TICK_PERIOD_MS 5
 #define LVGL_TASK_MAX_DELAY_MS 500
-#define LVGL_TASK_MIN_DELAY_MS 5
 #define LVGL_TASK_STACK_SIZE (8 * 1024)
 #define LVGL_TASK_PRIORITY 2
 
-// WiFi Credentials
 // WiFi Credentials
 #if __has_include("secrets.h")
 #include "secrets.h"

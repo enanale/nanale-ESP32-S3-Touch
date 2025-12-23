@@ -17,8 +17,7 @@ void PowerManager::begin() {
   // 2. EXIO_INT (IO 42) - NOT RTC, works for Light Sleep (Touch/Motion)
 
   // For Deep Sleep, we can only use RTC pins
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)EXAMPLE_PIN_NUM_PWR_STAT,
-                               0); // Active Low
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_USER_KEY, 0);
 }
 
 void PowerManager::update() {
@@ -44,7 +43,7 @@ void PowerManager::goToDeepSleep() {
   // 3. Ensure wakeup is set
   // Deep Sleep ONLY supports RTC pins (0-21). IO 16 is the Power Button.
   // IO 42 (EXIO_INT) is not RTC and cannot wake from Deep Sleep.
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)EXAMPLE_PIN_NUM_PWR_STAT, 0);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_USER_KEY, 0);
 
   // 4. Start Deep Sleep
   esp_deep_sleep_start();
