@@ -61,6 +61,10 @@
 #define CONFIG_DIM_TIMEOUT_SEC 30
 #define CONFIG_SLEEP_TIMEOUT_SEC 60
 
+// Time & NTP
+#define NTP_SERVER "pool.ntp.org"
+#define TZ_INFO "PST8PDT,M3.2.0,M11.1.0" // Pacific Time
+
 // LVGL Memory & Task Config
 #define LVGL_DMA_BUFF_LEN (LCD_H_RES * 64 * 2)
 #define LVGL_SPIRAM_BUFF_LEN (LCD_H_RES * LCD_V_RES * 2)

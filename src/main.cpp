@@ -11,6 +11,7 @@
 
 #include "motion_manager.h"
 #include "power_manager.h"
+#include "time_manager.h" // Added TimeManager include
 
 // Globals
 AppNetworkManager netMgr;
@@ -18,6 +19,7 @@ WeatherManager weatherMgr;
 BatteryManager batMgr;
 MotionManager motMgr;
 PowerManager pwrMgr;
+TimeManager timeMgr; // Added TimeManager global
 lv_obj_t *info_label = NULL;
 
 // Persist city index across deep sleep reboots
@@ -27,7 +29,7 @@ static unsigned long last_weather_update = 0;
 
 // UI Objects
 static lv_obj_t *ui_status_bar = NULL;
-static lv_obj_t *ui_status_label_wifi = NULL;
+static lv_obj_t *ui_status_label_wifi = NULL; // This will now be the time label
 static lv_obj_t *ui_status_label_bat = NULL;
 
 static lv_obj_t *ui_content_area = NULL;
@@ -70,10 +72,8 @@ void update_status_bar() {
   if (!ui_status_label_wifi || !ui_status_label_bat)
     return;
 
-  // WiFi & IP
-  String ip = WiFi.localIP().toString();
-  String status = WiFi.isConnected() ? ip : "Disconnected";
-  lv_label_set_text(ui_status_label_wifi, status.c_str());
+  // Update Time (Minute accuracy)
+  lv_label_set_text(ui_status_label_wifi, timeMgr.getTimeString().c_str());
 
   // Battery
   float voltage = batMgr.getVoltage();
@@ -135,13 +135,14 @@ void build_ui() {
   ui_status_bar = lv_obj_create(scr);
   lv_obj_set_size(ui_status_bar, LV_PCT(100), 30);
   lv_obj_set_align(ui_status_bar, LV_ALIGN_BOTTOM_MID);
-  lv_obj_set_style_bg_color(ui_status_bar, lv_palette_main(LV_PALETTE_BLUE), 0);
+  lv_obj_set_style_bg_color(ui_status_bar,
+                            lv_palette_main(LV_PALETTE_DEEP_PURPLE), 0);
   lv_obj_set_style_radius(ui_status_bar, 0, 0);
   lv_obj_set_style_border_width(ui_status_bar, 0, 0);
 
   // Status Labels
   ui_status_label_wifi = lv_label_create(ui_status_bar);
-  lv_label_set_text(ui_status_label_wifi, "Connecting...");
+  lv_label_set_text(ui_status_label_wifi, "--:--");
   lv_obj_set_style_text_color(ui_status_label_wifi, lv_color_white(), 0);
   lv_obj_align(ui_status_label_wifi, LV_ALIGN_LEFT_MID, 5, 0);
 
@@ -205,6 +206,7 @@ void setup() {
 
   netMgr.begin();
   batMgr.begin();
+  timeMgr.begin();
 
   current_city_index = rtc_city_index;
 
@@ -223,6 +225,7 @@ void loop() {
 
   pwrMgr.update();
   batMgr.update();
+  timeMgr.update();
 
   static unsigned long last_ui_update = 0;
   if (millis() - last_ui_update > 1000) {
