@@ -12,6 +12,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <cstring>
+#include <driver/ledc.h>
 
 static const char *TAG = "lvgl_port";
 
@@ -123,9 +124,15 @@ static void enable_display_power(void) {
   vTaskDelay(pdMS_TO_TICKS(120));
 }
 
-void lvgl_port_set_backlight(bool on) {
-  gpio_set_level((gpio_num_t)PIN_LCD_BL, on ? 0 : 1);
-  if (on)
+void lvgl_port_set_backlight(uint8_t brightness) {
+  // 1. PWM Control (Active Low)
+  // 0 -> Duty 1023 (Off), 255 -> Duty 0 (Full)
+  uint32_t duty = 1023 - (brightness * 1023 / 255);
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
+  // 2. Hardware Enable Pin (EXIO 1)
+  if (brightness > 0)
     tca9554_output_state |= (1 << EXIO_BL_EN);
   else
     tca9554_output_state &= ~(1 << EXIO_BL_EN);
@@ -232,15 +239,35 @@ void lvgl_port_init(void) {
   lvgl_mux = xSemaphoreCreateMutex();
   flush_done_semaphore = xSemaphoreCreateBinary();
 
-  // GPIO Init
+  // 1. LEDC PWM Init
+  ledc_timer_config_t ledc_timer = {
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .duty_resolution = LEDC_TIMER_10_BIT,
+      .timer_num = LEDC_TIMER_0,
+      .freq_hz = 5000,
+      .clk_cfg = LEDC_AUTO_CLK,
+  };
+  ledc_timer_config(&ledc_timer);
+
+  ledc_channel_config_t ledc_channel = {
+      .gpio_num = PIN_LCD_BL,
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .channel = LEDC_CHANNEL_0,
+      .intr_type = LEDC_INTR_DISABLE,
+      .timer_sel = LEDC_TIMER_0,
+      .duty = 1023, // Start OFF (Active Low)
+      .hpoint = 0,
+  };
+  ledc_channel_config(&ledc_channel);
+
+  // 2. GPIO Init (Reset only)
   gpio_config_t lcd_gpio_conf = {};
   lcd_gpio_conf.intr_type = GPIO_INTR_DISABLE;
   lcd_gpio_conf.mode = GPIO_MODE_OUTPUT;
-  lcd_gpio_conf.pin_bit_mask =
-      ((uint64_t)1 << PIN_LCD_RST) | ((uint64_t)1 << PIN_LCD_BL);
+  lcd_gpio_conf.pin_bit_mask = ((uint64_t)1 << PIN_LCD_RST);
   gpio_config(&lcd_gpio_conf);
 
-  lvgl_port_set_backlight(false);
+  lvgl_port_set_backlight(0);
 
   // SPI Bus
   spi_bus_config_t buscfg = {};

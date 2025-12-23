@@ -4,12 +4,17 @@
 #include "user_config.h"
 #include <Arduino.h>
 
-PowerManager::PowerManager() : lastActivityTime(0), timeoutMs(60000) {}
+PowerManager::PowerManager()
+    : lastActivityTime(0), timeoutMs(60000), dimTimeoutMs(30000),
+      isDimmed(false) {}
 
 void PowerManager::begin() {
   lastActivityTime = millis();
 #ifdef CONFIG_SLEEP_TIMEOUT_SEC
   timeoutMs = CONFIG_SLEEP_TIMEOUT_SEC * 1000;
+#endif
+#ifdef CONFIG_DIM_TIMEOUT_SEC
+  dimTimeoutMs = CONFIG_DIM_TIMEOUT_SEC * 1000;
 #endif
 
   // Configure wakeup source:
@@ -21,21 +26,38 @@ void PowerManager::begin() {
 }
 
 void PowerManager::update() {
-  if (isTimeoutReached()) {
+  unsigned long elapsed = millis() - lastActivityTime;
+
+  // Stage 1: Dimming
+  if (!isDimmed && elapsed > dimTimeoutMs && elapsed < timeoutMs) {
+    Serial.println("[PWR] Dimming display due to inactivity...");
+    lvgl_port_set_backlight(128); // 50%
+    isDimmed = true;
+  }
+
+  // Stage 2: Sleep
+  if (elapsed > timeoutMs) {
     Serial.println("[PWR] Activity timeout reached. Entering Deep Sleep...");
     goToDeepSleep();
   }
 }
 
-void PowerManager::resetTimer() { lastActivityTime = millis(); }
+void PowerManager::resetTimer() {
+  lastActivityTime = millis();
+  if (isDimmed) {
+    Serial.println("[PWR] Activity detected. Restoring brightness...");
+    lvgl_port_set_backlight(255); // 100%
+    isDimmed = false;
+  }
+}
 
 bool PowerManager::isTimeoutReached() {
   return (millis() - lastActivityTime > timeoutMs);
 }
 
 void PowerManager::goToDeepSleep() {
-  // 1. Turn off backlight
-  lvgl_port_set_backlight(false);
+  // 1. Turn off backlight completely
+  lvgl_port_set_backlight(0);
 
   // 2. Small delay for logs to flush
   delay(100);

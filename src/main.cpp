@@ -43,7 +43,7 @@ void check_power_button() {
     if (digitalRead(PIN_USER_KEY) == LOW) {
       Serial.println("[PWR] Button Pressed -> Going to Sleep...");
 
-      lvgl_port_set_backlight(false);
+      lvgl_port_set_backlight(0);
       delay(100);
 
       while (digitalRead(PIN_USER_KEY) == LOW) {
@@ -162,7 +162,7 @@ void build_ui() {
   ui_city_label = lv_label_create(ui_content_area);
   lv_obj_set_style_text_font(ui_city_label, &lv_font_montserrat_28, 0);
   lv_obj_set_style_text_color(ui_city_label, lv_color_white(), 0);
-  lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 20);
+  lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 0);
   lv_label_set_text(ui_city_label, "City");
 
   // Temp Label
@@ -178,7 +178,7 @@ void build_ui() {
   lv_obj_set_style_text_font(ui_cond_label, &lv_font_montserrat_18, 0);
   lv_obj_set_style_text_color(ui_cond_label,
                               lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
-  lv_obj_align(ui_cond_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+  lv_obj_align(ui_cond_label, LV_ALIGN_BOTTOM_MID, 0, -5);
   lv_label_set_text(ui_cond_label, "---");
 
   // 3. Gestures
@@ -191,7 +191,7 @@ void setup() {
   Serial.begin(115200);
 
   // Backlight off during boot
-  lvgl_port_set_backlight(false);
+  lvgl_port_set_backlight(0);
 
   lvgl_port_init();
 
@@ -200,7 +200,8 @@ void setup() {
     lvgl_unlock();
   }
 
-  lvgl_port_set_backlight(true);
+  // Backlight On
+  lvgl_port_set_backlight(255);
 
   netMgr.begin();
   batMgr.begin();

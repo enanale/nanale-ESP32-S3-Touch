@@ -14,7 +14,9 @@ public:
 
 private:
   unsigned long lastActivityTime;
-  unsigned long timeoutMs;
+  uint32_t timeoutMs;
+  uint32_t dimTimeoutMs;
+  bool isDimmed;
 };
 
 #endif
