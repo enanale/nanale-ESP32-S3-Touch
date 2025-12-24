@@ -1,8 +1,5 @@
 #include "lvgl_port.h"
-#include "user_config.h"
-#if CONFIG_ENABLE_AUDIO
-#include "audio_manager.h" // Added AudioManager
-#endif
+#include "audio_manager.h"
 #include "axs15231b/esp_lcd_axs15231b.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -12,6 +9,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lvgl.h"
+#include "user_config.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <cstring>
@@ -52,13 +50,14 @@ void touch_init(void) {
   lv_indev_t *indev = lv_indev_create();
   lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(indev, touch_read_cb);
+  extern lv_display_t *display;
+  if (display)
+    lv_indev_set_display(indev, display);
   indev_touch = indev;
 }
 
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
-#if CONFIG_ENABLE_AUDIO
-  extern AudioManager audioMgr; // Declare audioMgr inside the function scope
-#endif
+  extern AudioManager audioMgr;
   uint8_t buff[32] = {0};
 
   Wire.beginTransmission(TOUCH_I2C_ADDR);
@@ -78,22 +77,19 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static uint8_t last_state = LV_INDEV_STATE_RELEASED;
   bool touched = (buff[1] > 0 && buff[1] < 5);
   if (touched) {
-    if (last_state == LV_INDEV_STATE_RELEASED) {
-      ESP_LOGI(TAG, "[Touch] event: buff[1]=%d", buff[1]);
-    }
-    data->state = LV_INDEV_STATE_PRESSED;
     uint16_t pointX = (((uint16_t)buff[2] & 0x0f) << 8) | (uint16_t)buff[3];
     uint16_t pointY = (((uint16_t)buff[4] & 0x0f) << 8) | (uint16_t)buff[5];
 
-    // Coordinate Mapping: Landscape 270 deg
+    // Coordinate Mapping: Physical Portrait Frame (172 x 640)
+    // LVGL handles rotation internally (270 deg) if we provide physical
+    // coordinates. Based on Log:621,46 hit -> Physical X=125, Physical Y=621
     data->point.x = pointY;
-    data->point.y = LCD_V_RES - pointX;
+    data->point.y = (LCD_V_RES - 1) - pointX;
 
-#if CONFIG_ENABLE_AUDIO
-    if (last_state == LV_INDEV_STATE_RELEASED) {
-      audioMgr.playClick();
-    }
-#endif
+    data->point.x = pointY;
+    data->point.y = (LCD_V_RES - 1) - pointX;
+
+    data->state = LV_INDEV_STATE_PRESSED;
     last_state = LV_INDEV_STATE_PRESSED;
   } else {
     data->state = LV_INDEV_STATE_RELEASED;
@@ -388,6 +384,20 @@ void lvgl_port_init(void) {
   esp_timer_handle_t tick_timer = NULL;
   esp_timer_create(&tick_timer_args, &tick_timer);
   esp_timer_start_periodic(tick_timer, LVGL_TICK_PERIOD_MS * 1000);
+
+  // Unified Config (44.1kHz)
+  i2s_std_config_t std_cfg = {
+      .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(44100),
+      .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                      I2S_SLOT_MODE_STEREO),
+      .gpio_cfg = {.mclk = PIN_I2S_MCLK,
+                   .bclk = PIN_I2S_SCLK,
+                   .ws = PIN_I2S_LRCK,
+                   .dout = PIN_I2S_DOUT,
+                   .din = PIN_I2S_DIN},
+  };
+  std_cfg.slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_16BIT;
+  std_cfg.slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_16BIT; // Match 16-bit
 
   // Task
   xTaskCreatePinnedToCore(lvgl_port_task, "lvgl", LVGL_TASK_STACK_SIZE, NULL,

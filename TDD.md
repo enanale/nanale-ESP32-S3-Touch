@@ -21,6 +21,16 @@
     - **Clocking:** Physical MCLK (Pin 7) was unreliable. Resolved by deriving internal MCLK from BCLK (`Reg 0x01 = 0xBF`).
     - **Protocol:** Standard Philips I2S preferred over TDM for robust playback.
     - **Pins:** Verified Pin 45 as DOUT (DAC) and Pin 6 as DIN (ADC).
+- **Audio Recording (ES7210 - ADC):**
+    - **CRITICAL I2C Bus:** ES7210 is on **Wire1** (GPIO 47/48), NOT Wire (GPIO 17/18). Using wrong bus causes "device not found".
+    - **Sample Rate:** Vendor uses **24kHz**, not 44.1kHz. This is critical for proper operation.
+    - **MIC Power Registers:** Registers 0x47-0x4A must be set to 0x08 to enable microphone power (missing from basic init).
+    - **Vendor Register Sequence:** Complete initialization requires HPF filters (0x20-0x23), MAINCLK clear (0x02=0xC1), and final reset sequence.
+    - **Known Hardware Issues:** Some boards may have defective ES7210 chips or broken I2S traces. If chip responds on I2C but produces zero audio data despite correct configuration, suspect hardware defect.
+- **Touch Mapping & Rotation:**
+    - **Physical Frame:** LVGL expects input coordinates in the native 172x640 portrait frame, regardless of software rotation.
+    - **Mapping (270°):** To align with a 270-degree rotated landscape UI, raw points must be mapped as: `x = raw_ShortAxis`, `y = 639 - raw_LongAxis`.
+    - **Association:** Explicitly calling `lv_indev_set_display(indev, display)` ensures the input device correctly follows the display's rotation matrix.
 
 **New HAL Goals:**
 1.  **I2C Manager:** Initialize both I2C buses. Scan both to confirm RTC (`0x51`) and Touch (`0x3B`). [VERIFIED]

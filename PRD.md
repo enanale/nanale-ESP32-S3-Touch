@@ -36,7 +36,16 @@ A portable, battery-powered weather display station running on the Waveshare ESP
     - Fetch current weather data via Open-Meteo API every 15 minutes.
 - **Display Mode:**
     - Show City Name, Temperature (°F), and Condition (e.g., "Clear Sky").
-    - **Interaction:** Swipe Left/Right anywhere to toggle between cities.
+    - **Animated Weather Icons:** Dynamic LVGL vector animations representing weather codes (e.g., rotating rays for sun, drifting clouds, falling rain).
+- **Interaction:** Swipe Left/Right anywhere to toggle between cities.
+
+### 3.4 Audio Feedback & Control
+- **Audio Soundscape:**
+    - Startup Jingle: Premium signature sound on boot.
+    - Touch Feedback: Subtle "click" sounds for UI interactions.
+- **Audio Control:**
+    - **Toggle:** Compile-time flag `CONFIG_ENABLE_AUDIO` to completely disable audio components for silent operation.
+- **Hardware:** Utilizes ES8311 DAC and Standard Philips I2S protocol.
 
 ### 3.4 Power Management (Staged Auto-Sleep)
 - **Activity Tracking:** `PowerManager` resets idle timer on Touch or Motion (> 0.15g).
@@ -44,6 +53,15 @@ A portable, battery-powered weather display station running on the Waveshare ESP
 - **Stage 2 (Sleep):** After **60s** total inactivity, enter Deep Sleep.
 - **Backlight Control:** Uses hardware PWM (LEDC) for fine-grained brightness (0-255).
 - **Wakeup:** GPIO 16 (Power Button) triggers full reboot from Deep Sleep.
+
+### 3.6 Voice Memo (Voice Notes)
+- **Functionality:** Record and playback short voice clips (up to 30 seconds).
+- **Controls:**
+    - **Record Button:** Toggles recording ON/OFF. Overwrites previous memo. Shows visual "Recording" state.
+    - **Playback Button:** Plays the most recent recording.
+- **Microphone:** Uses dual onboard microphones via ES7210 ADC (I2S).
+- **Audio Output:** Plays back through the ES8311 DAC.
+- **Memory Management:** Audio data is stored in the 8MB PSRAM for high fidelity and fast access without wearing out the Flash.
 
 ### 3.5 UI Aesthetic & Layout
 - **Status Bar:**
@@ -63,19 +81,25 @@ A portable, battery-powered weather display station running on the Waveshare ESP
 
 ## 5. Future Roadmap
 
-### 5.1 Visual & Aesthetic Upgrades
-- **Weather Icons:** Replace text-only conditions with custom icons or animations.
-- **Dynamic Backgrounds:** Gradients or effects that change based on weather or time of day.
-- **Smooth Transitions:** LVGL animations when switching between cities.
+### 5.1 Advanced Visuals
+- **Dynamic Backgrounds:** Glassmorphism effects and gradients that shift based on current conditions or time (e.g., warm oranges for sunset, deep blues for rainy days).
+- **Smooth Transitions:** LVGL-powered sliding animations when switching locations.
+- **Particle Systems:** Weather-specific particle effects (e.g., subtle snow particles floating across the background).
 
-### 5.2 Audio Integration (ES8311 DAC)
-- **Haptic/Audio Feedback:** Subtle sounds for touch events and button presses.
-- **Startup Jingle:** A premium audio signature on wake/boot.
+### 5.2 Voice & Contextual Intelligence
+- **Voice Synthesis (TTS):** Announce the current weather when the device is picked up (using motion trigger).
+- **Audio AI:** Basic voice command recognition (e.g., "Refresh", "Next City") using the ES7210.
+- **Contextual Notifications:** Audio-visual alerts for extreme weather events (e.g., "Storm Warning" jingle).
 
-### 5.3 Advanced Utility
-- **Detailed Forecast:** A "drill-down" view (e.g., 5-day forecast) accessible via tap.
-- **System Dashboard:** Technical stats (WiFi RSSI, Memory usage, Battery history charts).
+### 5.3 Smart Home & Connectivity
+- **Web Portal:** A local web dashboard (hosted on the ESP) to manage city lists, WiFi credentials, and custom themes.
+- **ESP-NOW / MQTT:** Integration with local sensors to display indoor temperature/humidity alongside outdoor data.
+- **Home Assistant:** Integration to use the device as a secondary display for smart home states.
 
-### 5.4 Smart & Contextual Features
-- **Auto-Brightness:** Time-aware brightness levels (Day vs Night modes).
-- **Auto-Orientation:** Use IMU (Accelerometer) to rotate UI for horizontal/vertical use.
+### 5.4 Sleep & Health Utilities
+- **Sunrise Alarm:** Gradually fade in the backlight (simulated sunrise) to wake the user gently.
+- **Sleep Motion Analysis:** Basic sleep cycle tracking using the onboard accelerometer during bedside charging.
+
+### 5.5 System & Customization
+- **Theme Engine:** Pre-built UI profiles (e.g., "Cyberpunk", "Minimalist White", "Retro Terminal").
+- **Auto-Orientation:** Automatic UI rotation using the IMU for flexible desktop placement.

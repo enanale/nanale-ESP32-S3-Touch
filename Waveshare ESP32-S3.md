@@ -177,9 +177,11 @@ The transition to LVGL V9 requires specific backend porting for the QSPI AXS1523
 
 The touch controller is accessed via I2C (SDA:8, SCL:9). The Touch\_INT pin (GPIO 16\) goes LOW when a touch is detected.
 
-* **Interrupt:** Attach an interrupt to GPIO 16 (FALLING or LOW).  
-* **Driver:** The AXS15231B usually embeds the touch logic. Standard generic capacitive touch libraries might need I2C register tweaking.  
-* **Reading:** When INT goes low, read I2C to get X/Y coordinates. Ensure you map the 172x640 hardware coordinates to your logical rotation.
+* **Reading:** When INT goes low, read I2C to get X/Y coordinates. 
+* **Coordinate Mapping:** LVGL V9 expects input device coordinates in the **physical (unrotated) portrait frame** (172 x 640). If the display is rotated 270 degrees in software, the driver must map raw touch points accordingly:
+    *   **Physical X** = `pointY` (short axis)
+    *   **Physical Y** = `(640 - 1) - pointX` (long axis)
+    *   *Note: Native hardware origin is effectively the lower-right corner when held horizontally.*
 
 ### **4\. Audio (Recording & Playback)**
 
@@ -231,6 +233,73 @@ void setupAudio() {
     // CRITICAL: For ES8311 on this board, Internal Clocking is recommended.
     // Configure ES8311 via I2C to derive internal MCLK from BCLK (Reg 0x01 = 0xBF).
 }
+
+#### **ES7210 (ADC/Microphone) Critical Configuration**
+
+**⚠️ CRITICAL: I2C Bus Usage**
+- ES7210 is on **Wire1** (GPIO 47/48 - System Bus), **NOT Wire** (GPIO 17/18 - Touch Bus)
+- Using the wrong I2C bus will cause "device not found" errors
+- Always use `Wire1.beginTransmission(0x40)` for ES7210
+
+**Vendor-Verified Configuration (24kHz, 16-bit):**
+
+The vendor's ESP-IDF example uses:
+- **Sample Rate**: 24000 Hz (not 44.1kHz)
+- **Bit Depth**: 16-bit
+- **Mode**: TDM mode in vendor code, but Standard I2S also works
+- **I2C Address**: 0x40
+
+**Critical ES7210 Registers (from vendor driver):**
+
+```cpp
+// Reset and wake
+writeRegES7210(0x00, 0xFF);  // Reset
+writeRegES7210(0x00, 0x41);  // Wake
+
+// Clock configuration
+writeRegES7210(0x01, 0x3F);  // Clock off register
+writeRegES7210(0x02, 0xC1);  // MAINCLK - clear state (CRITICAL)
+writeRegES7210(0x06, 0x00);  // Power up
+writeRegES7210(0x07, 0x20);  // OSR
+writeRegES7210(0x08, 0x00);  // Slave mode
+
+// TDM and HPF (vendor-specific)
+writeRegES7210(0x09, 0x30);  // TDM mode / chip state cycle
+writeRegES7210(0x0A, 0x30);  // TDM slot / power on cycle
+writeRegES7210(0x20, 0x0A);  // ADC34 HPF2
+writeRegES7210(0x21, 0x2A);  // ADC34 HPF1
+writeRegES7210(0x22, 0x0A);  // ADC12 HPF1
+writeRegES7210(0x23, 0x2A);  // ADC12 HPF2
+
+// Format
+writeRegES7210(0x11, 0x60);  // 16-bit Philips I2S
+writeRegES7210(0x12, 0x00);  // Normal operation (not TDM)
+
+// Microphone configuration
+writeRegES7210(0x40, 0x43);  // Analog power
+writeRegES7210(0x41, 0x70);  // MIC12 bias 2.87v
+writeRegES7210(0x42, 0x70);  // MIC34 bias 2.87v
+
+// CRITICAL MIC POWER REGISTERS (from vendor)
+writeRegES7210(0x47, 0x08);  // MIC1 power - CRITICAL!
+writeRegES7210(0x48, 0x08);  // MIC2 power - CRITICAL!
+writeRegES7210(0x49, 0x08);  // MIC3 power - CRITICAL!
+writeRegES7210(0x4A, 0x08);  // MIC4 power - CRITICAL!
+writeRegES7210(0x4B, 0x00);  // MIC12 power enable
+
+// Mic gains
+writeRegES7210(0x43, 0x1F);  // MIC1 gain max + enable
+writeRegES7210(0x44, 0x1F);  // MIC2 gain max + enable
+
+// Final reset (vendor sequence)
+writeRegES7210(0x00, 0x71);
+writeRegES7210(0x00, 0x41);
+```
+
+**Known Issues:**
+- Some boards may have defective ES7210 chips or broken I2S traces
+- If ES7210 initializes on I2C but produces zero audio data despite correct configuration, suspect hardware issue
+- Vendor example uses 24kHz sample rate, not 44.1kHz
 
 ## **5\. Critical Development Notes**
 

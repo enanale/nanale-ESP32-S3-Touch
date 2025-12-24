@@ -17,7 +17,7 @@ void BatteryManager::update() {
     int raw = analogRead(_pin);
     _voltage = (raw / 4095.0) * 3.3 * 3.0;
 
-    Serial.printf("[BATT] Volts: %.2fV\n", _voltage);
+    // Serial.printf("[BATT] Volts: %.2fV\n", _voltage);
   }
 }
 

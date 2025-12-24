@@ -4,11 +4,13 @@
 #include <math.h>
 
 static i2s_chan_handle_t tx_chan = NULL;
+static i2s_chan_handle_t rx_chan = NULL; // Add RX channel for recording
 
-AudioManager::AudioManager() : _initialized(false) {}
+AudioManager::AudioManager()
+    : _initialized(false), _isRecording(false), _isMemoPlaying(false),
+      _memoBuffer(nullptr), _memoSize(0), _maxMemoSamples(0) {}
 
 bool AudioManager::begin() {
-#if CONFIG_ENABLE_AUDIO
   Serial.println("[AUDIO] Initializing Standard Philips (Internal Clock)...");
   Serial.flush();
 
@@ -24,13 +26,16 @@ bool AudioManager::begin() {
     return false;
   }
 
+  if (!initES7210()) {
+    Serial.println("[AUDIO] Error: ES7210 init failed.");
+    Serial.flush();
+    return false;
+  }
+
   _initialized = true;
-  Serial.println("[AUDIO] System Ready (Standard Philips)");
+  Serial.println("[AUDIO] System Ready (DAC + MIC)");
 
   return true;
-#else
-  return false;
-#endif
 }
 
 bool AudioManager::initCodec() {
@@ -90,12 +95,14 @@ bool AudioManager::initI2S() {
   i2s_chan_config_t chan_cfg =
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
   chan_cfg.auto_clear = true;
-  if (i2s_new_channel(&chan_cfg, &tx_chan, NULL) != ESP_OK)
+
+  // Create both TX and RX channels for playback and recording
+  if (i2s_new_channel(&chan_cfg, &tx_chan, &rx_chan) != ESP_OK)
     return false;
 
-  // Standard Philips: 44.1kHz, 16-bit, Stereo
+  // Standard Philips: 24kHz (vendor config), 16-bit, Stereo
   i2s_std_config_t std_cfg = {
-      .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(44100),
+      .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(24000), // 24kHz like vendor
       .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                       I2S_SLOT_MODE_STEREO),
       .gpio_cfg =
@@ -104,7 +111,7 @@ bool AudioManager::initI2S() {
               .bclk = PIN_I2S_SCLK,
               .ws = PIN_I2S_LRCK,
               .dout = PIN_I2S_DOUT,
-              .din = I2S_GPIO_UNUSED,
+              .din = PIN_I2S_DIN, // Enable DIN for recording!
               .invert_flags =
                   {
                       .mclk_inv = false,
@@ -117,9 +124,16 @@ bool AudioManager::initI2S() {
   // High compatibility slot width
   std_cfg.slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_32BIT;
 
+  // Initialize both TX and RX channels
   if (i2s_channel_init_std_mode(tx_chan, &std_cfg) != ESP_OK)
     return false;
+  if (i2s_channel_init_std_mode(rx_chan, &std_cfg) != ESP_OK)
+    return false;
+
+  // Enable both channels
   if (i2s_channel_enable(tx_chan) != ESP_OK)
+    return false;
+  if (i2s_channel_enable(rx_chan) != ESP_OK)
     return false;
 
   return true;
@@ -132,10 +146,82 @@ bool AudioManager::writeReg(uint8_t r, uint8_t v) {
   return (Wire1.endTransmission() == 0);
 }
 
+bool AudioManager::initES7210() {
+  Serial.println("[AUDIO] Initializing ES7210...");
+  delay(10);
+
+  bool ok = true;
+
+  // CRITICAL: Test I2C communication on Wire1 (NOT Wire!)
+  Wire1.beginTransmission(ES7210_I2C_ADDR);
+  if (Wire1.endTransmission() != 0) {
+    Serial.println("[AUDIO] ERROR: ES7210 not responding on I2C!");
+    return false;
+  }
+  Serial.println("[AUDIO] ES7210 I2C communication OK");
+
+  // Reset and wake
+  ok &= writeRegES7210(0x00, 0xFF); // Reset
+  delay(10);
+  ok &= writeRegES7210(0x00, 0x41); // Wake
+
+  // Clock configuration
+  ok &= writeRegES7210(0x01, 0x3F); // Clock off register
+  ok &= writeRegES7210(0x02, 0xC1); // MAINCLK - clear state (CRITICAL)
+  ok &= writeRegES7210(0x06, 0x00); // Power up
+  ok &= writeRegES7210(0x07, 0x20); // OSR
+  ok &= writeRegES7210(0x08, 0x00); // Slave mode
+
+  // TDM and HPF (vendor-specific)
+  ok &= writeRegES7210(0x09, 0x30); // TDM mode / chip state cycle
+  ok &= writeRegES7210(0x0A, 0x30); // TDM slot / power on cycle
+  ok &= writeRegES7210(0x20, 0x0A); // ADC34 HPF2
+  ok &= writeRegES7210(0x21, 0x2A); // ADC34 HPF1
+  ok &= writeRegES7210(0x22, 0x0A); // ADC12 HPF1
+  ok &= writeRegES7210(0x23, 0x2A); // ADC12 HPF2
+
+  // Format
+  ok &= writeRegES7210(0x11, 0x60); // 16-bit Philips I2S
+  ok &= writeRegES7210(0x12, 0x00); // Normal operation (not TDM)
+
+  // Microphone configuration
+  ok &= writeRegES7210(0x40, 0x43); // Analog power
+  ok &= writeRegES7210(0x41, 0x70); // MIC12 bias 2.87v
+  ok &= writeRegES7210(0x42, 0x70); // MIC34 bias 2.87v
+
+  // CRITICAL MIC POWER REGISTERS (from vendor)
+  ok &= writeRegES7210(0x47, 0x08); // MIC1 power - CRITICAL!
+  ok &= writeRegES7210(0x48, 0x08); // MIC2 power - CRITICAL!
+  ok &= writeRegES7210(0x49, 0x08); // MIC3 power - CRITICAL!
+  ok &= writeRegES7210(0x4A, 0x08); // MIC4 power - CRITICAL!
+  ok &= writeRegES7210(0x4B, 0x00); // MIC12 power enable
+
+  // Mic gains
+  ok &= writeRegES7210(0x43, 0x1F); // MIC1 gain max + enable
+  ok &= writeRegES7210(0x44, 0x1F); // MIC2 gain max + enable
+
+  // Final reset (vendor sequence)
+  ok &= writeRegES7210(0x00, 0x71);
+  ok &= writeRegES7210(0x00, 0x41);
+
+  if (ok)
+    Serial.println("[AUDIO] ES7210 Configured OK.");
+  else
+    Serial.println("[AUDIO] Warning: ES7210 Config failed (I2C error).");
+
+  return ok;
+}
+
+bool AudioManager::writeRegES7210(uint8_t r, uint8_t v) {
+  Wire1.beginTransmission(ES7210_I2C_ADDR); // CRITICAL: Wire1!
+  Wire1.write(r);
+  Wire1.write(v);
+  return (Wire1.endTransmission() == 0);
+}
+
 // Final cleanup: removed dumpRegisters implementation
 
 void AudioManager::playClick() {
-#if CONFIG_ENABLE_AUDIO
   if (!_initialized)
     return;
   Serial.println("[AUDIO] Playing Click...");
@@ -155,11 +241,9 @@ void AudioManager::playClick() {
   i2s_channel_write(tx_chan, buf, num_samples * 2 * sizeof(int16_t), &written,
                     100);
   free(buf);
-#endif
 }
 
 void AudioManager::playJingle() {
-#if CONFIG_ENABLE_AUDIO
   if (!_initialized)
     return;
   Serial.println("[AUDIO] Playing Jingle...");
@@ -185,7 +269,125 @@ void AudioManager::playJingle() {
     free(buf);
     delay(30);
   }
-#endif
 }
 
 void AudioManager::update() {}
+
+// ===== Voice Memo Recording Functions =====
+
+// Forward declaration for recording task
+void audio_recording_task_real(void *arg);
+
+bool AudioManager::startRecording() {
+  if (_isRecording) {
+    Serial.println("[AUDIO] Already recording!");
+    return false;
+  }
+
+  // Allocate PSRAM buffer for memo
+  _memoBuffer = (int16_t *)ps_malloc(3 * 1024 * 1024); // 3MB in PSRAM
+  if (!_memoBuffer) {
+    Serial.println("[AUDIO] ERROR: Failed to allocate PSRAM for memo!");
+    return false;
+  }
+
+  _isRecording = true;
+  _memoSize = 0;
+  _maxMemoSamples = (3 * 1024 * 1024) / sizeof(int16_t);
+
+  // Start recording task
+  xTaskCreatePinnedToCore(audio_recording_task_real, "audio_rec", 4096, this, 3,
+                          NULL, 1);
+
+  Serial.println("[AUDIO] Recording Started (PSRAM)...");
+  return true;
+}
+
+void AudioManager::stopRecording() {
+  if (!_isRecording)
+    return;
+
+  _isRecording = false;
+  Serial.printf("[AUDIO] Recording Stopped. Captured %d bytes.\n", _memoSize);
+}
+
+void AudioManager::startMemoPlayback() {
+  if (_memoSize == 0) {
+    Serial.println("[AUDIO] No recording to play!");
+    return;
+  }
+
+  if (_isMemoPlaying) {
+    Serial.println("[AUDIO] Already playing!");
+    return;
+  }
+
+  _isMemoPlaying = true;
+  Serial.printf("[AUDIO] Playing memo (%d bytes)...\n", _memoSize);
+
+  size_t written = 0;
+  size_t totalWritten = 0;
+
+  while (totalWritten < _memoSize && _isMemoPlaying) {
+    size_t chunkSize =
+        (_memoSize - totalWritten > 4096) ? 4096 : (_memoSize - totalWritten);
+
+    if (i2s_channel_write(tx_chan, (uint8_t *)_memoBuffer + totalWritten,
+                          chunkSize, &written, 100) == ESP_OK) {
+      totalWritten += written;
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+
+  _isMemoPlaying = false;
+  Serial.println("[AUDIO] Playback complete.");
+}
+
+// Recording task implementation
+void audio_recording_task_real(void *arg) {
+  AudioManager *mgr = (AudioManager *)arg;
+  int16_t *buffer = mgr->getMemoBuffer();
+  uint32_t maxSamples = mgr->getMaxMemoSamples();
+
+  Serial.println("[AUDIO] Recording task started");
+
+  while (mgr->isRecording() &&
+         (mgr->getMemoSize() / sizeof(int16_t)) < maxSamples) {
+    int16_t chunk[512];
+    size_t bytesRead = 0;
+
+    // Read from I2S RX channel
+    if (i2s_channel_read(rx_chan, chunk, sizeof(chunk), &bytesRead, 100) ==
+        ESP_OK) {
+      if (bytesRead > 0) {
+        // Copy to PSRAM buffer
+        size_t currentSamples = mgr->getMemoSize() / sizeof(int16_t);
+        size_t samplesToAdd = bytesRead / sizeof(int16_t);
+
+        if (currentSamples + samplesToAdd <= maxSamples) {
+          memcpy(buffer + currentSamples, chunk, bytesRead);
+          mgr->addMemoSize(bytesRead);
+
+          // Simple VU meter (log peaks occasionally)
+          static int logCounter = 0;
+          if (++logCounter >= 20) { // Log every 20 chunks
+            int16_t peak = 0;
+            for (size_t i = 0; i < samplesToAdd; i++) {
+              if (abs(chunk[i]) > peak)
+                peak = abs(chunk[i]);
+            }
+            if (peak > 100) { // Only log if there's signal
+              Serial.printf("[VU] Peak: %d\n", peak);
+            }
+            logCounter = 0;
+          }
+        }
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+
+  Serial.println("[AUDIO] Recording task ended");
+  vTaskDelete(NULL);
+}

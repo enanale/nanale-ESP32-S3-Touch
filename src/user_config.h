@@ -71,7 +71,7 @@
 #define CONFIG_SLEEP_TIMEOUT_SEC 60
 
 // Feature Toggles
-#define CONFIG_ENABLE_AUDIO 0
+#define CONFIG_ENABLE_JINGLE 0
 
 // Time & NTP
 #define NTP_SERVER "pool.ntp.org"
