@@ -1,5 +1,8 @@
 #include "lvgl_port.h"
+#include "user_config.h"
+#if CONFIG_ENABLE_AUDIO
 #include "audio_manager.h" // Added AudioManager
+#endif
 #include "axs15231b/esp_lcd_axs15231b.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -9,7 +12,6 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lvgl.h"
-#include "user_config.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <cstring>
@@ -54,7 +56,9 @@ void touch_init(void) {
 }
 
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
+#if CONFIG_ENABLE_AUDIO
   extern AudioManager audioMgr; // Declare audioMgr inside the function scope
+#endif
   uint8_t buff[32] = {0};
 
   Wire.beginTransmission(TOUCH_I2C_ADDR);
@@ -85,9 +89,11 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.x = pointY;
     data->point.y = LCD_V_RES - pointX;
 
+#if CONFIG_ENABLE_AUDIO
     if (last_state == LV_INDEV_STATE_RELEASED) {
       audioMgr.playClick();
     }
+#endif
     last_state = LV_INDEV_STATE_PRESSED;
   } else {
     data->state = LV_INDEV_STATE_RELEASED;

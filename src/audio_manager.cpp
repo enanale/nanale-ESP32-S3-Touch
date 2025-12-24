@@ -8,6 +8,7 @@ static i2s_chan_handle_t tx_chan = NULL;
 AudioManager::AudioManager() : _initialized(false) {}
 
 bool AudioManager::begin() {
+#if CONFIG_ENABLE_AUDIO
   Serial.println("[AUDIO] Initializing Standard Philips (Internal Clock)...");
   Serial.flush();
 
@@ -27,6 +28,9 @@ bool AudioManager::begin() {
   Serial.println("[AUDIO] System Ready (Standard Philips)");
 
   return true;
+#else
+  return false;
+#endif
 }
 
 bool AudioManager::initCodec() {
@@ -131,6 +135,7 @@ bool AudioManager::writeReg(uint8_t r, uint8_t v) {
 // Final cleanup: removed dumpRegisters implementation
 
 void AudioManager::playClick() {
+#if CONFIG_ENABLE_AUDIO
   if (!_initialized)
     return;
   Serial.println("[AUDIO] Playing Click...");
@@ -150,9 +155,11 @@ void AudioManager::playClick() {
   i2s_channel_write(tx_chan, buf, num_samples * 2 * sizeof(int16_t), &written,
                     100);
   free(buf);
+#endif
 }
 
 void AudioManager::playJingle() {
+#if CONFIG_ENABLE_AUDIO
   if (!_initialized)
     return;
   Serial.println("[AUDIO] Playing Jingle...");
@@ -178,6 +185,7 @@ void AudioManager::playJingle() {
     free(buf);
     delay(30);
   }
+#endif
 }
 
 void AudioManager::update() {}

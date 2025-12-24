@@ -9,7 +9,11 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "weather_icons.h" // Added WeatherIcon
+
+#if CONFIG_ENABLE_AUDIO
 #include "audio_manager.h" // Added AudioManager
+#endif
 #include "motion_manager.h"
 #include "power_manager.h"
 #include "time_manager.h" // Added TimeManager include
@@ -20,9 +24,12 @@ WeatherManager weatherMgr;
 BatteryManager batMgr;
 MotionManager motMgr;
 PowerManager pwrMgr;
-TimeManager timeMgr;   // Added TimeManager global
+TimeManager timeMgr; // Added TimeManager global
+#if CONFIG_ENABLE_AUDIO
 AudioManager audioMgr; // Added AudioManager global
+#endif
 lv_obj_t *info_label = NULL;
+WeatherIcon weatherIcon; // Added WeatherIcon global
 
 // Persist city index across deep sleep reboots
 static int RTC_DATA_ATTR rtc_city_index = 0;
@@ -68,6 +75,9 @@ void update_weather_ui() {
   String tempStr = String(data.tempF, 1) + "°F";
   lv_label_set_text(ui_temp_label, tempStr.c_str());
   lv_label_set_text(ui_cond_label, data.condition.c_str());
+
+  // Update Animated Icon
+  weatherIcon.setWeather(data.weather_code);
 }
 
 void update_status_bar() {
@@ -168,12 +178,18 @@ void build_ui() {
   lv_obj_align(ui_city_label, LV_ALIGN_TOP_MID, 0, 0);
   lv_label_set_text(ui_city_label, "City");
 
+  // Weather Icon (Center-Left)
+  weatherIcon.create(ui_content_area);
+  lv_obj_set_align(lv_obj_get_child(ui_content_area, -1), LV_ALIGN_CENTER);
+  lv_obj_set_x(lv_obj_get_child(ui_content_area, -1), -60);
+
   // Temp Label
   ui_temp_label = lv_label_create(ui_content_area);
   lv_obj_set_style_text_font(ui_temp_label, &lv_font_montserrat_40, 0);
   lv_obj_set_style_text_color(ui_temp_label, lv_palette_main(LV_PALETTE_YELLOW),
                               0);
-  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_align(ui_temp_label, LV_ALIGN_CENTER, 40,
+               0); // Shifted right to make room for icon
   lv_label_set_text(ui_temp_label, "--°F");
 
   // Condition Label
@@ -209,8 +225,10 @@ void setup() {
   netMgr.begin();
   batMgr.begin();
   timeMgr.begin();
+#if CONFIG_ENABLE_AUDIO
   audioMgr.begin();      // Initialize Audio
   audioMgr.playJingle(); // Play startup jingle
+#endif
 
   current_city_index = rtc_city_index;
 

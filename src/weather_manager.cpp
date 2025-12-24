@@ -54,7 +54,7 @@ void WeatherManager::fetchRealData() {
         int code = doc["current"]["weather_code"];
 
         _forecasts.push_back(
-            {city.name, (int)tempF, getWeatherCondition(code)});
+            {city.name, tempF, getWeatherCondition(code), code});
         Serial.println("[WEATHER] Success!");
       } else {
         Serial.print("[WEATHER] JSON Error: ");
@@ -122,7 +122,7 @@ String WeatherManager::getWeatherCondition(int code) {
 
 WeatherData WeatherManager::getWeather(int index) {
   if (_forecasts.empty()) {
-    return {"Loading...", 0.0, ""};
+    return {"Loading...", 0.0, "", 0};
   }
   if (index >= 0 && index < _forecasts.size()) {
     return _forecasts[index];

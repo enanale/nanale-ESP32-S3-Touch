@@ -11,6 +11,7 @@ struct WeatherData {
   String city;
   float tempF;
   String condition;
+  int weather_code;
 };
 
 struct CityCoords {
