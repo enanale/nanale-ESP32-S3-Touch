@@ -21,7 +21,7 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 | IO3 | | | | | | | | IO3 | |
 | IO4 | | | | | | | | IO4 | BAT_ADC |
 | IO5 | | | | | | | | IO5 | |
-| IO6 | | | | | | I2S_DSOUT | | IO6 | |
+| IO6 | | | | | | I2S_DIN | | IO6 | |
 | IO7 | | | | | | I2S_MCLK | | IO7 | |
 | IO8 | LCD_BL | | | | | | | | |
 | IO9 | LCD_CS | | | | | | | | |
@@ -44,7 +44,7 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 | IO42 | | | | | | | | IO42 | EXIO_INT |
 | IO43 | | | | | TXD | | | IO43 | |
 | IO44 | | | | | RXD | | | IO44 | |
-| IO45 | | | | | | I2S_DSDIN | | IO45 | |
+| IO45 | | | | | | I2S_DOUT | | IO45 | |
 | IO46 | | | | | | I2S_LRCK | | IO46 | |
 | IO47 | | | IMU_SDA | RTC_SDA | | Audio_SDA | | IO47 | |
 | IO48 | | | IMU_SCL | RTC_SCL | | Audio_SCL | | IO48 | |
@@ -134,11 +134,11 @@ The **ESP32-S3-Touch-LCD-3.49** is a highly integrated development board by Wave
 
 | Function | GPIO Pin | Notes |
 | :---- | :---- | :---- |
-| **I2S\_MCLK** | GPIO 2 | Master Clock |
-| **I2S\_SCLK** | GPIO 3 | Bit Clock |
-| **I2S\_LRCK** | GPIO 5 | Word Select (WS) |
-| **I2S\_DOUT** | GPIO 4 | Data Out (To Speaker/DAC) |
-| **I2S\_DIN** | GPIO 6 | Data In (From Mic/ADC) |
+| **I2S\_MCLK** | GPIO 7 | Master Clock (Internal derivation recommended) |
+| **I2S\_SCLK** | GPIO 15 | Bit Clock (BCLK) |
+| **I2S\_LRCK** | GPIO 46 | Word Select (WS/LRCK) |
+| **I2S\_DOUT** | GPIO 45 | Data Out (To ES8311 DAC) |
+| **I2S\_DIN** | GPIO 6 | Data In (From ES7210 ADC) |
 
 ## **4\. Technical Implementation Details**
 
@@ -190,10 +190,10 @@ This board uses **ES7210** for recording (ADC) and **ES8311** for playback (DAC)
 \#include \<driver/i2s.h\>
 
 \#define I2S\_NUM         I2S\_NUM\_0  
-\#define I2S\_MCLK\_GPIO   2  
-\#define I2S\_BCLK\_GPIO   3  
-\#define I2S\_LRCK\_GPIO   5  
-\#define I2S\_DOUT\_GPIO   4  
+\#define I2S\_MCLK\_GPIO   7  
+\#define I2S\_BCLK\_GPIO   15  
+\#define I2S\_LRCK\_GPIO   46  
+\#define I2S\_DOUT\_GPIO   45  
 \#define I2S\_DIN\_GPIO    6
 
 void setupAudio() {  
@@ -225,35 +225,11 @@ void setupAudio() {
         .data\_in\_num \= I2S\_DIN\_GPIO  
     };
 
-    // 3\. Configure I2S Driver
-    i2s\_config\_t i2s\_config \= {
-        .mode \= (i2s\_mode\_t)(I2S\_MODE\_MASTER | I2S\_MODE\_TX | I2S\_MODE\_RX),
-        .sample\_rate \= 16000, // or 44100
-        .bits\_per\_sample \= I2S\_BITS\_PER\_SAMPLE\_16BIT,
-        .channel\_format \= I2S\_CHANNEL\_FMT\_RIGHT\_LEFT,
-        .communication\_format \= I2S\_COMM\_FORMAT\_STAND\_I2S,
-        .intr\_alloc\_flags \= ESP\_INTR\_FLAG\_LEVEL1,
-        .dma\_buf\_count \= 8,
-        .dma\_buf\_len \= 64,
-        .use\_apll \= true,
-        .tx\_desc\_auto\_clear \= true,
-        .fixed\_mclk \= 0
-    };
-
-    i2s\_pin\_config\_t pin\_config \= {
-        .bck\_io\_num \= I2S\_BCLK\_GPIO,
-        .ws\_io\_num \= I2S\_LRCK\_GPIO,
-        .data\_out\_num \= I2S\_DOUT\_GPIO,
-        .data\_in\_num \= I2S\_DIN\_GPIO
-    };
-
     i2s\_driver\_install(I2S\_NUM, \&i2s\_config, 0, NULL);
     i2s\_set\_pin(I2S\_NUM, \&pin\_config);
-    i2s\_set\_clk(I2S\_NUM, 16000, I2S\_BITS\_PER\_SAMPLE\_16BIT, I2S\_CHANNEL\_STEREO);
 
-    // Important: MCLK is often required by ES8311/ES7210
-    PIN\_FUNC\_SELECT(GPIO\_PIN\_MUX\_REG\[I2S\_MCLK\_GPIO\], PIN\_FUNC\_GPIO);
-    // Specific register manipulation might be needed to output MCLK on GPIO 2 if not automatic.
+    // CRITICAL: For ES8311 on this board, Internal Clocking is recommended.
+    // Configure ES8311 via I2C to derive internal MCLK from BCLK (Reg 0x01 = 0xBF).
 }
 
 ## **5\. Critical Development Notes**

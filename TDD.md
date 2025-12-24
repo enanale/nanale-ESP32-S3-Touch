@@ -17,6 +17,10 @@
 - **LVGL Integration:**
     - **Assembler Error:** `LV_USE_DRAW_SW_ASM` must be disabled (`LV_DRAW_SW_ASM_NONE`) or patched for ESP32 (Xtensa) as the default helium assembly is for Arm.
     - **Linking Demos:** Library source exclusion rules prevent `lv_demo_widgets` from linking. Required manual compilation adapter (`src/lvgl_demos.c`) to include demo sources and assets.
+- **Audio Integration (ES8311):**
+    - **Clocking:** Physical MCLK (Pin 7) was unreliable. Resolved by deriving internal MCLK from BCLK (`Reg 0x01 = 0xBF`).
+    - **Protocol:** Standard Philips I2S preferred over TDM for robust playback.
+    - **Pins:** Verified Pin 45 as DOUT (DAC) and Pin 6 as DIN (ADC).
 
 **New HAL Goals:**
 1.  **I2C Manager:** Initialize both I2C buses. Scan both to confirm RTC (`0x51`) and Touch (`0x3B`). [VERIFIED]

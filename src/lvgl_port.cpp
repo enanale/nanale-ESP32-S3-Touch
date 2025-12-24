@@ -71,8 +71,12 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   }
   Wire.readBytes(buff, 32);
 
+  static uint8_t last_state = LV_INDEV_STATE_RELEASED;
   bool touched = (buff[1] > 0 && buff[1] < 5);
   if (touched) {
+    if (last_state == LV_INDEV_STATE_RELEASED) {
+      ESP_LOGI(TAG, "[Touch] event: buff[1]=%d", buff[1]);
+    }
     data->state = LV_INDEV_STATE_PRESSED;
     uint16_t pointX = (((uint16_t)buff[2] & 0x0f) << 8) | (uint16_t)buff[3];
     uint16_t pointY = (((uint16_t)buff[4] & 0x0f) << 8) | (uint16_t)buff[5];
@@ -81,14 +85,12 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.x = pointY;
     data->point.y = LCD_V_RES - pointX;
 
-    static uint8_t last_state = LV_INDEV_STATE_RELEASED;
     if (last_state == LV_INDEV_STATE_RELEASED) {
       audioMgr.playClick();
     }
     last_state = LV_INDEV_STATE_PRESSED;
   } else {
     data->state = LV_INDEV_STATE_RELEASED;
-    static uint8_t last_state = LV_INDEV_STATE_RELEASED;
     last_state = LV_INDEV_STATE_RELEASED;
   }
 }
@@ -115,13 +117,18 @@ static void i2c_scan(TwoWire &wire, const char *bus_name) {
 static void enable_display_power(void) {
   Wire1.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
   delay(50);
-  i2c_scan(Wire1, "System (Wire1)");
 
   // TCA9554 Config: Bit 1 (BL_EN), 6 (SYS_EN), 7 (NS_MODE) as Output
   Wire1.beginTransmission(TCA9554_ADDR);
   Wire1.write(0x03); // Config register
   Wire1.write(0x3D); // 0011 1101
-  Wire1.endTransmission();
+  byte err = Wire1.endTransmission();
+  if (err != 0) {
+    ESP_LOGE(TAG, "[I2C] Failed to config TCA9554 at 0x%02x (Error %d)",
+             TCA9554_ADDR, err);
+  } else {
+    ESP_LOGI(TAG, "[I2C] TCA9554 Config OK");
+  }
 
   // Latch Power
   tca9554_output_state =
@@ -129,7 +136,27 @@ static void enable_display_power(void) {
   Wire1.beginTransmission(TCA9554_ADDR);
   Wire1.write(0x01); // Output register
   Wire1.write(tca9554_output_state);
-  Wire1.endTransmission();
+  err = Wire1.endTransmission();
+  if (err != 0) {
+    ESP_LOGE(TAG, "[I2C] Failed to write TCA9554 Output (Error %d)", err);
+  } else {
+    ESP_LOGI(TAG, "[I2C] System Power & Amp Enabled");
+    delay(50);
+
+    // Read back to confirm TCA9554 state
+    Wire1.beginTransmission(TCA9554_ADDR);
+    Wire1.write(0x01); // Output port register
+    if (Wire1.endTransmission(false) == 0) {
+      Wire1.requestFrom((uint8_t)TCA9554_ADDR, (uint8_t)1);
+      if (Wire1.available()) {
+        uint8_t val = Wire1.read();
+        ESP_LOGI(TAG, "[TCA9554] Output Reg read-back: 0x%02X (Expect 0x%02X)",
+                 val, tca9554_output_state);
+      }
+    }
+
+    i2c_scan(Wire1, "Post-Init System (Wire1)");
+  }
 
   vTaskDelay(pdMS_TO_TICKS(120));
 }

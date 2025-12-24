@@ -7,6 +7,9 @@
 *.hex
 *.map
 
+# Local Python for PlatformIO
+.pio_python/
+
 # Editors
 .vscode/
 .idea/

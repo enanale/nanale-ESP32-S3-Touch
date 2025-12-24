@@ -9,12 +9,13 @@ A simplified, clean implementation of LVGL 9 on the Waveshare ESP32-S3-Touch-LCD
 - **Connectivity**: WiFi connection management with status display.
 - **Weather**: Real-time weather fetching (Open-Meteo) and display in Fahrenheit.
 - **Power Management**: Application-level Sleep/Wake using side button (GPIO 16) and Light Sleep.
+- **Audio Support**: Functional startup jingle and haptic click feedback using ES8311 DAC and internal clock derivation.
 
 ## Hardware
 - **Board**: Waveshare ESP32-S3-Touch-LCD-3.49
 - **Display Driver**: QSPI interface (`esp_lcd_axs15231b`).
 - **Resolution**: 172(H) x 640(V) Physical, rotated to 640 x 172 Logical.
-- **Touch Controller**: CST328 (I2C) - *Skipped per user request*.
+- **Touch Controller**: CST328 (I2C) - Functional with swipe and long-press support.
 
 ## Configuration
 - **PlatformIO**: Managed via `platformio.ini`.
@@ -22,6 +23,9 @@ A simplified, clean implementation of LVGL 9 on the Waveshare ESP32-S3-Touch-LCD
 - **Display Pins**:
   - CS: 9, PCLK: 10, RST: 21, Backlight: 8
   - Data: 11, 12, 13, 14
+- **Audio Pins (I2S)**:
+  - BCLK: 15, LRCK: 46, DOUT: 45, DIN: 6
+  - MCLK: Pin 7 (Software-configured for internal derivation from BCLK).
 - **Power Button**: GPIO 16 (Active Low).
 - **Color Swap**: `LV_COLOR_16_SWAP=1` enabled in build flags.
 
@@ -48,3 +52,4 @@ A simplified, clean implementation of LVGL 9 on the Waveshare ESP32-S3-Touch-LCD
 - [x] Battery Monitoring (ADC GPIO 4)
 - [x] Power Button Sleep/Wake
 - [x] Touch Input (Functional)
+- [x] Audio Support (ES8311 DAC + Jingle/Clicks)

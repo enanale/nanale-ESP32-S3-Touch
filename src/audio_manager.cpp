@@ -1,53 +1,83 @@
 #include "audio_manager.h"
+#include "driver/i2s_std.h"
 #include "user_config.h"
-#include <Arduino.h>        // For Serial.println, delay, Wire
-#include <driver/i2s_std.h> // Keep this for i2s_std types and functions
 #include <math.h>
 
-// ES8311 Register Definitions (Simplified)
-#define ES8311_RESET_REG 0x00
-#define ES8311_CLK_MANAGER_REG 0x01
-#define ES8311_SDP_CONFIG_REG 0x02
-#define ES8311_SYSTEM_CONFIG_REG 0x03
-#define ES8311_DAC_CONFIG1_REG 0x31
-#define ES8311_DAC_CONFIG2_REG 0x32
-#define ES8311_DAC_VOLUME_REG 0x33
-
-// I2S channel handle for the new I2S driver
 static i2s_chan_handle_t tx_chan = NULL;
 
 AudioManager::AudioManager() : _initialized(false) {}
 
 bool AudioManager::begin() {
-  Serial.println("[AUDIO] Initializing ES8311...");
+  Serial.println("[AUDIO] Initializing Standard Philips (Internal Clock)...");
+  Serial.flush();
 
   if (!initCodec()) {
-    Serial.println("[AUDIO] Failed to init ES8311 Codec");
+    Serial.println("[AUDIO] Error: ES8311 init failed.");
+    Serial.flush();
     return false;
   }
 
   if (!initI2S()) {
-    Serial.println("[AUDIO] Failed to init I2S");
+    Serial.println("[AUDIO] Error: Failed to init I2S Philips!");
+    Serial.flush();
     return false;
   }
 
   _initialized = true;
-  Serial.println("[AUDIO] System Ready");
+  Serial.println("[AUDIO] System Ready (Standard Philips)");
+
   return true;
 }
 
 bool AudioManager::initCodec() {
-  writeReg(ES8311_RESET_REG, 0x1F); // Full Reset
-  delay(10);
-  writeReg(ES8311_RESET_REG, 0x00); // Normal operation
+  delay(100);
 
-  // Basic setup for 16kHz, 16-bit, I2S mode
-  writeReg(0x01, 0x30); // Clock manager
-  writeReg(0x02, 0x10); // SDP Config
-  writeReg(0x03, 0x10); // System Config
-  writeReg(0x31, 0x00); // DAC Config 1
-  writeReg(0x32, 0x00); // DAC Config 2
-  writeReg(0x33, 0xBF); // Volume (0-255)
+  // --- Clock & Reset (ES8311 Regs 0x00 - 0x08) ---
+
+  // Reg 0x00: Digital Reset & CSM. 0x80 = Reset digital, CSM on.
+  writeReg(0x00, 0x80);
+
+  // Reg 0x01: Master Clock Selection. 0xBF = 1011 1111.
+  // Bit 7=1: Derive internal MCLK from BCLK/SCLK (Critical workaround for Pin
+  // 7/2 issues). Bits 5:0=1: Enable internal logic clocks.
+  writeReg(0x01, 0xBF);
+
+  // Reg 0x02: Clock Divider. 0x18 = 0001 1000.
+  // Bits 4:3 = 11: Set BCLK as the internal source for the MCLK-derivation
+  // logic.
+  writeReg(0x02, 0x18);
+
+  // Regs 0x03-0x08: FSM & OSR Dividers. 0x10 and 0x00 values are standard
+  // for 44.1kHz with a 64*fs or 32*fs Bit Clock.
+  writeReg(0x03, 0x10);
+  writeReg(0x04, 0x10);
+  writeReg(0x05, 0x00);
+  writeReg(0x06, 0x00);
+  writeReg(0x07, 0x00);
+  writeReg(0x08, 0x00);
+
+  // --- Serial Data Port (Reg 0x09) ---
+
+  // Reg 0x09: 0x0C = 0000 1100.
+  // Bits 3:2 = 11: 16-bit word length.
+  // Bits 1:0 = 00: Philips Standard I2S format.
+  writeReg(0x09, 0x0C);
+
+  // --- System Power & Enable (Regs 0x0B - 0x14) ---
+
+  writeReg(0x0B, 0x00);
+  writeReg(0x0C, 0x00);
+  writeReg(0x0D, 0x01); // Power Up Analog
+  writeReg(0x0E, 0x02); // Power Up DAC
+  writeReg(0x10, 0x1F); // VREF Config
+  writeReg(0x11, 0x7F); // Bias Config
+  writeReg(0x12, 0x00); // Enable DAC Digital
+  writeReg(0x14, 0x1A); // Analog Gain (PGA)
+
+  // --- volume & Mute (Regs 0x31 - 0x32) ---
+
+  writeReg(0x31, 0x00); // Analog Mute (0x00 = Unmute)
+  writeReg(0x32, 0xBF); // Digital Volume (0xBF is approx 95%)
 
   return true;
 }
@@ -55,15 +85,18 @@ bool AudioManager::initCodec() {
 bool AudioManager::initI2S() {
   i2s_chan_config_t chan_cfg =
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-  i2s_new_channel(&chan_cfg, &tx_chan, NULL);
+  chan_cfg.auto_clear = true;
+  if (i2s_new_channel(&chan_cfg, &tx_chan, NULL) != ESP_OK)
+    return false;
 
+  // Standard Philips: 44.1kHz, 16-bit, Stereo
   i2s_std_config_t std_cfg = {
       .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(44100),
-      .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
-                                                  I2S_SLOT_MODE_MONO),
+      .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                      I2S_SLOT_MODE_STEREO),
       .gpio_cfg =
           {
-              .mclk = PIN_I2S_MCLK,
+              .mclk = I2S_GPIO_UNUSED, // Not using physical MCLK pin
               .bclk = PIN_I2S_SCLK,
               .ws = PIN_I2S_LRCK,
               .dout = PIN_I2S_DOUT,
@@ -77,58 +110,74 @@ bool AudioManager::initI2S() {
           },
   };
 
-  i2s_channel_init_std_mode(tx_chan, &std_cfg);
-  i2s_channel_enable(tx_chan);
+  // High compatibility slot width
+  std_cfg.slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_32BIT;
+
+  if (i2s_channel_init_std_mode(tx_chan, &std_cfg) != ESP_OK)
+    return false;
+  if (i2s_channel_enable(tx_chan) != ESP_OK)
+    return false;
 
   return true;
 }
 
-void AudioManager::writeReg(uint8_t reg, uint8_t val) {
+bool AudioManager::writeReg(uint8_t r, uint8_t v) {
   Wire1.beginTransmission(ES8311_I2C_ADDR);
-  Wire1.write(reg);
-  Wire1.write(val);
-  Wire1.endTransmission();
+  Wire1.write(r);
+  Wire1.write(v);
+  return (Wire1.endTransmission() == 0);
 }
+
+// Final cleanup: removed dumpRegisters implementation
 
 void AudioManager::playClick() {
   if (!_initialized)
     return;
+  Serial.println("[AUDIO] Playing Click...");
 
-  // Simple square wave pulse for "click"
-  int16_t sample[200];
-  for (int i = 0; i < 200; i++) {
-    sample[i] = (i < 100) ? 15000 : -15000;
+  int num_samples = (44100 * 30) / 1000;
+  int16_t *buf = (int16_t *)malloc(num_samples * 2 * sizeof(int16_t));
+  if (!buf)
+    return;
+
+  for (int i = 0; i < num_samples; i++) {
+    int16_t s = (i < num_samples / 2) ? 31000 : -31000;
+    buf[i * 2] = s;     // Left
+    buf[i * 2 + 1] = s; // Right
   }
 
-  size_t bytes_written;
-  i2s_channel_write(tx_chan, sample, sizeof(sample), &bytes_written, 100);
+  size_t written;
+  i2s_channel_write(tx_chan, buf, num_samples * 2 * sizeof(int16_t), &written,
+                    100);
+  free(buf);
 }
 
 void AudioManager::playJingle() {
   if (!_initialized)
     return;
+  Serial.println("[AUDIO] Playing Jingle...");
 
-  // Basic startup melody (3 notes)
   int notes[] = {440, 554, 659, 880};
-  int duration = 150; // ms
+  int dur = 150;
 
   for (int n = 0; n < 4; n++) {
-    int freq = notes[n];
-    int num_samples = (44100 * duration) / 1000;
-    int16_t *buf = (int16_t *)malloc(num_samples * sizeof(int16_t));
+    int num_samples = (44100 * dur) / 1000;
+    int16_t *buf = (int16_t *)malloc(num_samples * 2 * sizeof(int16_t));
+    if (!buf)
+      continue;
 
     for (int i = 0; i < num_samples; i++) {
-      buf[i] = 10000 * sin(2 * M_PI * freq * i / 44100);
+      int16_t s = 25000 * sin(2 * 3.14159 * notes[n] * i / 44100);
+      buf[i * 2] = s;
+      buf[i * 2 + 1] = s;
     }
 
-    size_t bytes_written;
-    i2s_channel_write(tx_chan, buf, num_samples * sizeof(int16_t),
-                      &bytes_written, 500);
+    size_t written;
+    i2s_channel_write(tx_chan, buf, num_samples * 2 * sizeof(int16_t), &written,
+                      500);
     free(buf);
     delay(30);
   }
 }
 
-void AudioManager::update() {
-  // Background tasks if needed (e.g. queue management)
-}
+void AudioManager::update() {}

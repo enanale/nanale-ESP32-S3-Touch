@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <driver/i2s.h>
+#include <driver/i2s_std.h>
 
 class AudioManager {
 public:
@@ -16,10 +16,9 @@ public:
 private:
   bool initCodec();
   bool initI2S();
-  void writeReg(uint8_t reg, uint8_t val);
+  bool writeReg(uint8_t reg, uint8_t val); // Returns true on ACK
 
   bool _initialized;
-  i2s_port_t _i2s_port;
 };
 
 #endif

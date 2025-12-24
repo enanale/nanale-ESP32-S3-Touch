@@ -36,10 +36,10 @@
 #define PIN_UART_RX (GPIO_NUM_44)
 
 // I2S Audio
-#define PIN_I2S_MCLK (GPIO_NUM_2)
-#define PIN_I2S_SCLK (GPIO_NUM_3)
-#define PIN_I2S_LRCK (GPIO_NUM_5)
-#define PIN_I2S_DOUT (GPIO_NUM_4)
+#define PIN_I2S_MCLK (GPIO_NUM_7)
+#define PIN_I2S_SCLK (GPIO_NUM_15)
+#define PIN_I2S_LRCK (GPIO_NUM_46)
+#define PIN_I2S_DOUT (GPIO_NUM_45)
 #define PIN_I2S_DIN (GPIO_NUM_6)
 
 // -------------------------------------------------------------------------
