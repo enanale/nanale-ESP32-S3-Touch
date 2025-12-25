@@ -73,6 +73,9 @@
 // Feature Toggles
 #define CONFIG_ENABLE_JINGLE 0
 
+// Display Configuration
+#define CONFIG_DISPLAY_BRIGHTNESS 200 // 0-255 (128 = 50%, 255 = 100%)
+
 // Time & NTP
 #define NTP_SERVER "pool.ntp.org"
 #define TZ_INFO "PST8PDT,M3.2.0,M11.1.0" // Pacific Time

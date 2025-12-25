@@ -30,8 +30,10 @@ void PowerManager::update() {
 
   // Stage 1: Dimming
   if (!isDimmed && elapsed > dimTimeoutMs && elapsed < timeoutMs) {
-    Serial.println("[PWR] Dimming display due to inactivity...");
-    lvgl_port_set_backlight(128); // 50%
+    uint8_t dimBrightness = CONFIG_DISPLAY_BRIGHTNESS / 2;
+    Serial.printf("[PWR] Dimming display to %d (from %d)...\n", dimBrightness,
+                  CONFIG_DISPLAY_BRIGHTNESS);
+    lvgl_port_set_backlight(dimBrightness);
     isDimmed = true;
   }
 
@@ -46,7 +48,7 @@ void PowerManager::resetTimer() {
   lastActivityTime = millis();
   if (isDimmed) {
     Serial.println("[PWR] Activity detected. Restoring brightness...");
-    lvgl_port_set_backlight(255); // 100%
+    lvgl_port_set_backlight(CONFIG_DISPLAY_BRIGHTNESS);
     isDimmed = false;
   }
 }

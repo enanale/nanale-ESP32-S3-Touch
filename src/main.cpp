@@ -66,7 +66,7 @@ void setup() {
   }
 
   // Backlight On
-  lvgl_port_set_backlight(255);
+  lvgl_port_set_backlight(CONFIG_DISPLAY_BRIGHTNESS);
 
   netMgr.begin();
   batMgr.begin();
