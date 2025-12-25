@@ -103,11 +103,12 @@ bool AudioManager::initI2S() {
   // Standard Philips: 24kHz (vendor config), 16-bit, Stereo
   i2s_std_config_t std_cfg = {
       .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(24000), // 24kHz like vendor
-      .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
-                                                      I2S_SLOT_MODE_STEREO),
+      .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                  I2S_SLOT_MODE_STEREO),
       .gpio_cfg =
           {
-              .mclk = I2S_GPIO_UNUSED, // Not using physical MCLK pin
+              .mclk =
+                  PIN_I2S_MCLK, // Enable MCLK for ES7210 (ES8311 uses internal)
               .bclk = PIN_I2S_SCLK,
               .ws = PIN_I2S_LRCK,
               .dout = PIN_I2S_DOUT,
@@ -165,8 +166,8 @@ bool AudioManager::initES7210() {
   delay(10);
   ok &= writeRegES7210(0x00, 0x41); // Wake
 
-  // Clock configuration
-  ok &= writeRegES7210(0x01, 0x3F); // Clock off register
+  // Clock configuration (24kHz from vendor table)
+  ok &= writeRegES7210(0x01, 0x01); // Clock ON for 24kHz (was 0x3F = OFF!)
   ok &= writeRegES7210(0x02, 0xC1); // MAINCLK - clear state (CRITICAL)
   ok &= writeRegES7210(0x06, 0x00); // Power up
   ok &= writeRegES7210(0x07, 0x20); // OSR
@@ -353,33 +354,55 @@ void audio_recording_task_real(void *arg) {
 
   while (mgr->isRecording() &&
          (mgr->getMemoSize() / sizeof(int16_t)) < maxSamples) {
-    int16_t chunk[512];
+    // I2S sends 32-bit slots with 16-bit data left-aligned in upper bits
+    int32_t chunk32[256]; // Read as 32-bit
     size_t bytesRead = 0;
 
-    // Read from I2S RX channel
-    if (i2s_channel_read(rx_chan, chunk, sizeof(chunk), &bytesRead, 100) ==
+    // Read from I2S RX channel (32-bit slots)
+    if (i2s_channel_read(rx_chan, chunk32, sizeof(chunk32), &bytesRead, 100) ==
         ESP_OK) {
       if (bytesRead > 0) {
-        // Copy to PSRAM buffer
+        size_t samples32 = bytesRead / sizeof(int32_t);
         size_t currentSamples = mgr->getMemoSize() / sizeof(int16_t);
-        size_t samplesToAdd = bytesRead / sizeof(int16_t);
 
-        if (currentSamples + samplesToAdd <= maxSamples) {
-          memcpy(buffer + currentSamples, chunk, bytesRead);
-          mgr->addMemoSize(bytesRead);
+        if (currentSamples + samples32 <= maxSamples) {
+          // DIAGNOSTIC: Log first raw 32-bit value to see what we're getting
+          static bool firstLog = true;
+          if (firstLog && samples32 > 0) {
+            Serial.printf(
+                "[DEBUG] Raw 32-bit I2S values: 0x%08X, 0x%08X, 0x%08X\n",
+                chunk32[0], chunk32[1], chunk32[2]);
+            Serial.printf("[DEBUG] Upper 16 bits: %d, %d, %d\n",
+                          (int16_t)(chunk32[0] >> 16),
+                          (int16_t)(chunk32[1] >> 16),
+                          (int16_t)(chunk32[2] >> 16));
+            Serial.printf("[DEBUG] Lower 16 bits: %d, %d, %d\n",
+                          (int16_t)(chunk32[0] & 0xFFFF),
+                          (int16_t)(chunk32[1] & 0xFFFF),
+                          (int16_t)(chunk32[2] & 0xFFFF));
+            firstLog = false;
+          }
 
-          // Simple VU meter (log peaks occasionally)
-          static int logCounter = 0;
-          if (++logCounter >= 20) { // Log every 20 chunks
-            int16_t peak = 0;
-            for (size_t i = 0; i < samplesToAdd; i++) {
-              if (abs(chunk[i]) > peak)
-                peak = abs(chunk[i]);
-            }
-            if (peak > 100) { // Only log if there's signal
-              Serial.printf("[VU] Peak: %d\n", peak);
-            }
-            logCounter = 0;
+          // Extract upper 16 bits from each 32-bit sample (left-aligned data)
+          for (size_t i = 0; i < samples32; i++) {
+            // Shift right by 16 to get the upper 16 bits
+            buffer[currentSamples + i] = (int16_t)(chunk32[i] >> 16);
+          }
+          mgr->addMemoSize(samples32 * sizeof(int16_t));
+
+          // VU meter - calculate peak for this chunk
+          int16_t peak = 0;
+          for (size_t i = 0; i < samples32; i++) {
+            int16_t sample = buffer[currentSamples + i];
+            if (abs(sample) > peak)
+              peak = abs(sample);
+          }
+
+          // Only log if there's any non-zero signal
+          if (peak > 0) {
+            Serial.printf("[VU] Peak: %d | First samples: %d, %d, %d\n", peak,
+                          buffer[currentSamples], buffer[currentSamples + 1],
+                          buffer[currentSamples + 2]);
           }
         }
       }

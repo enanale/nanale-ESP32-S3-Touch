@@ -72,7 +72,9 @@ void setup() {
   batMgr.begin();
   timeMgr.begin();
   audioMgr.begin();
+#if CONFIG_ENABLE_JINGLE
   audioMgr.playJingle();
+#endif
 
   pinMode(PIN_USER_KEY, INPUT);
   motMgr.begin();

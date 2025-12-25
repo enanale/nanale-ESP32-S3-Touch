@@ -68,7 +68,7 @@
 // -------------------------------------------------------------------------
 
 #define CONFIG_DIM_TIMEOUT_SEC 30
-#define CONFIG_SLEEP_TIMEOUT_SEC 60
+#define CONFIG_SLEEP_TIMEOUT_SEC 600
 
 // Feature Toggles
 #define CONFIG_ENABLE_JINGLE 0
