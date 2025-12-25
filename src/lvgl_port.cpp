@@ -357,7 +357,7 @@ void lvgl_port_init(void) {
   vTaskDelay(pdMS_TO_TICKS(30));
 
   ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
-  lvgl_port_set_backlight(true);
+  lvgl_port_set_backlight(0);
 
   // LVGL Init
   lv_init();
